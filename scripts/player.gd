@@ -125,6 +125,12 @@ func update_hand_display(animate: bool = true):
 	print("hand数组大小：", hand.size())
 	print("hand_container子节点数：", hand_container.get_child_count())
 
+	# 输出hand数组中的所有卡牌
+	if hand.size() <= 5:  # 只在手牌少时详细输出
+		print("hand数组内容：")
+		for i in range(hand.size()):
+			print("  [%d] %s" % [i, hand[i].get_card_name()])
+
 	# 第一步：彻底清理hand_container中所有不在hand数组中的卡牌
 	var to_remove = []
 	for child in hand_container.get_children():
@@ -133,14 +139,15 @@ func update_hand_display(animate: bool = true):
 				to_remove.append(child)
 
 	for card in to_remove:
-		print("移除不在hand数组中的卡牌：", card)
+		print("移除不在hand数组中的卡牌：", card.get_card_name())
 		hand_container.remove_child(card)
 		card.visible = false  # 隐藏已出的牌
+		card.is_selectable = false  # 确保不可选择
 
 	# 第二步：确保hand数组中的所有卡牌都在hand_container中
 	for card in hand:
 		if card.get_parent() != hand_container:
-			print("将卡牌添加到hand_container：", card)
+			print("将卡牌添加到hand_container：", card.get_card_name())
 			# 如果卡牌在其他父节点，先移除
 			if card.get_parent():
 				card.get_parent().remove_child(card)
@@ -179,6 +186,17 @@ func update_hand_display(animate: bool = true):
 				card.position = target_pos
 
 		card.z_index = i
+
+	# 输出更新后的位置信息（只在手牌少时）
+	if hand.size() <= 5:
+		print("更新后的卡牌位置：")
+		for i in range(hand.size()):
+			var card = hand[i]
+			print("  [%d] %s at pos(%d, %d) visible=%s selectable=%s" % [
+				i, card.get_card_name(),
+				int(card.position.x), int(card.position.y),
+				card.visible, card.is_selectable
+			])
 
 	print("=== update_hand_display 完成 ===") 
 
