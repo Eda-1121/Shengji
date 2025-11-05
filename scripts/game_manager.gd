@@ -968,15 +968,20 @@ func can_beat_card(card1: Card, card2: Card) -> bool:
 	return card1.compare_to(card2, trump_suit, current_level) > 0
 
 func show_played_cards(player_id: int, cards: Array):
-	"""显示出的牌"""
+	"""显示出的牌到出牌区域"""
 	var position = play_area_positions[player_id]
 
 	for i in range(cards.size()):
 		var card = cards[i]
-		# 确保牌从原父节点移除并添加到game_manager
+
+		# 如果卡牌还有父节点（不应该有，因为execute_play_cards已经移除了）
 		if card.get_parent():
+			print("  ⚠ 警告：show_played_cards时卡牌 %s 还有父节点: %s" % [card.get_card_name(), card.get_parent().name])
 			card.get_parent().remove_child(card)
+
+		# 添加到game_manager以显示在出牌区
 		add_child(card)
+		print("  - 添加到出牌区: %s" % card.get_card_name())
 
 		# 使用全局坐标，确保牌显示在正确的屏幕位置
 		card.global_position = position + Vector2(i * 20, 0)
