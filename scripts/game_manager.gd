@@ -50,6 +50,7 @@ var bid_decision_made: bool = false
 
 signal phase_changed(phase: GamePhase)
 signal game_over(winner_team: int)
+signal burying_completed
 
 func _ready():
 	print("=== GameManager 初始化 (Phase 2) ===")
@@ -169,7 +170,7 @@ func start_new_round():
 	print("\n[步骤4] 开始发牌（发牌过程中可随时叫牌）")
 	print("  - 从庄家 %s 开始发牌" % players[dealer_index].player_name)
 	await get_tree().process_frame
-	start_dealing_cards()
+	await start_dealing_cards()
 
 # =====================================
 # 发牌系统
@@ -226,7 +227,7 @@ func start_dealing_cards():
 		var card = human_player.hand[i]
 		print("  [%d] %s 对象ID=%s, parent=%s" % [i, card.get_card_name(), card.get_instance_id(), card.get_parent().name if card.get_parent() else "无"])
 
-	finish_dealing()
+	await finish_dealing()
 
 func check_and_handle_bidding(player: Player, latest_card: Card):
 	"""检查玩家是否可以叫牌，并处理叫牌"""
@@ -350,7 +351,7 @@ func finish_dealing():
 
 	if players[dealer_index].player_type == Player.PlayerType.HUMAN:
 		print("  - 庄家是人类玩家，等待手动埋底")
-		start_burying_phase()
+		await start_burying_phase()
 	else:
 		print("  - 庄家是AI玩家，自动埋底")
 		await ai_bury_bottom()
@@ -649,6 +650,11 @@ func start_burying_phase():
 		ui_manager.show_bury_button(true)
 		ui_manager.set_bury_button_enabled(false)
 
+	# 等待埋底完成
+	print("  - 等待埋底完成信号...")
+	await burying_completed
+	print("  - 埋底完成信号已收到！")
+
 func _on_bury_cards_pressed():
 	"""玩家点击埋底按钮"""
 	print("\n[埋底] 玩家确认埋底")
@@ -681,6 +687,10 @@ func _on_bury_cards_pressed():
 	print("  - 埋底完成！")
 	print("  - 庄家剩余手牌: %d张" % dealer.hand.size())
 	print("  - 底牌总分: %d分" % GameRules.calculate_points(bottom_cards))
+
+	# 发射埋底完成信号，解除start_burying_phase()的等待
+	print("  - 发射埋底完成信号")
+	burying_completed.emit()
 
 	if ui_manager:
 		ui_manager.show_bury_button(false)
@@ -723,7 +733,7 @@ func ai_bury_bottom():
 	print("等待1.5秒...")
 	await get_tree().create_timer(1.5).timeout
 	print("调用 auto_bury_for_player()")
-	auto_bury_for_player(dealer)
+	await auto_bury_for_player(dealer)
 
 # =====================================
 # 出牌阶段
