@@ -782,17 +782,20 @@ func _on_play_cards_pressed():
 		if ui_manager:
 			ui_manager.show_center_message("请先选择要出的牌!", 1.5)
 		return
-	
+
+	# 先复制一份要出的牌，避免后续操作影响
+	var cards_to_play: Array[Card] = []
 	for card in human_player.selected_cards:
 		card.set_trump(trump_suit, current_level)
-	
-	var pattern = GameRules.identify_pattern(human_player.selected_cards, trump_suit, current_level)
+		cards_to_play.append(card)
 
-	if not GameRules.validate_play(human_player.selected_cards, human_player.hand):
+	var pattern = GameRules.identify_pattern(cards_to_play, trump_suit, current_level)
+
+	if not GameRules.validate_play(cards_to_play, human_player.hand):
 		if ui_manager:
 			ui_manager.show_center_message("无效的出牌!", 1.5)
 		return
-	
+
 	if current_trick.is_empty():
 		# 首家出牌
 		if pattern.pattern_type == GameRules.CardPattern.THROW:
@@ -800,21 +803,25 @@ func _on_play_cards_pressed():
 			if not validate_throw(human_player, pattern):
 				if ui_manager:
 					ui_manager.show_center_message("甩牌失败! 其他人能管上", 2.0)
-				# 甩牌失败，只出最大的牌
-				var largest_card = GameRules.get_largest_card(pattern.cards, trump_suit, current_level)
+
+				# 甩牌失败，清理所有选中牌的选择状态
+				for card in human_player.selected_cards:
+					card.set_selected(false)
 				human_player.selected_cards.clear()
-				human_player.selected_cards.append(largest_card)
+
+				# 只出最大的牌
+				var largest_card = GameRules.get_largest_card(pattern.cards, trump_suit, current_level)
+				cards_to_play.clear()
+				cards_to_play.append(largest_card)
 				pattern = GameRules.identify_pattern([largest_card], trump_suit, current_level)
-		
-		if human_player.play_selected_cards():
-			show_played_cards(0, pattern.cards)
-			
+
+		# 手动处理出牌流程（避免play_selected_cards和show_played_cards冲突）
+		if execute_play_cards(human_player, cards_to_play):
 			current_trick.append({
 				"player_id": human_player.player_id,
-				"cards": pattern.cards,
+				"cards": cards_to_play,
 				"pattern": pattern
 			})
-
 
 			if ui_manager:
 				ui_manager.show_center_message("出牌成功!", 1.0)
@@ -826,28 +833,76 @@ func _on_play_cards_pressed():
 	else:
 		# 跟牌
 		var lead_pattern = current_trick[0]["pattern"]
-		
+
 		if not GameRules.can_follow(pattern, lead_pattern, human_player.hand, trump_suit, current_level):
 			if ui_manager:
 				ui_manager.show_center_message("跟牌不符合规则!", 1.5)
 			return
-		
-		if human_player.play_selected_cards():
-			show_played_cards(0, pattern.cards)
-			
+
+		# 手动处理出牌流程
+		if execute_play_cards(human_player, cards_to_play):
 			current_trick.append({
 				"player_id": human_player.player_id,
-				"cards": pattern.cards,
+				"cards": cards_to_play,
 				"pattern": pattern
 			})
-			
+
 			if ui_manager:
 				ui_manager.show_center_message("跟牌成功!", 1.0)
-			
+
 			if current_trick.size() == 4:
 				evaluate_trick()
 			else:
 				next_player_turn()
+
+func execute_play_cards(player: Player, cards_to_play: Array[Card]) -> bool:
+	"""
+	统一的出牌处理函数
+	1. 从玩家手牌中移除卡牌
+	2. 清空选择状态
+	3. 显示出的牌到出牌区域
+	4. 更新手牌显示
+	"""
+	if cards_to_play.is_empty():
+		print("错误：没有要出的牌")
+		return false
+
+	print("\n[出牌] %s 出 %d 张牌" % [player.player_name, cards_to_play.size()])
+
+	# 1. 从手牌中移除，并清理选择状态
+	for card in cards_to_play:
+		if not player.hand.has(card):
+			print("错误：卡牌不在手牌中")
+			return false
+
+		# 取消选择状态
+		if card.is_selected:
+			card.is_selected = false
+			if card.sprite:
+				card.sprite.modulate = Color.WHITE
+
+		# 从手牌数组移除
+		player.hand.erase(card)
+
+		# 从选中列表移除
+		if player.selected_cards.has(card):
+			player.selected_cards.erase(card)
+
+		# 断开信号
+		if card.card_clicked.is_connected(player._on_card_clicked):
+			card.card_clicked.disconnect(player._on_card_clicked)
+
+	# 清空选中列表
+	player.selected_cards.clear()
+
+	# 2. 显示出的牌到出牌区域（这里会从hand_container移除并添加到game_manager）
+	show_played_cards(player.player_id, cards_to_play)
+
+	# 3. 更新手牌显示
+	player.update_hand_display(true)
+
+	print("  - 出牌成功，剩余手牌：%d张" % player.hand.size())
+	return true
 
 func validate_throw(player: Player, throw_pattern: GameRules.PlayPattern) -> bool:
 	"""验证甩牌是否成功"""
@@ -906,68 +961,67 @@ func next_player_turn():
 
 func ai_play_turn(ai_player: Player):
 	"""AI出牌"""
-	print("=== ai_play_turn() 被调用 ===")
-	print("AI玩家：", ai_player.player_name, " (player_id=", ai_player.player_id, ")")
-	print("当前阶段：", current_phase)
+	print("\n[AI出牌] %s 思考中..." % ai_player.player_name)
+	print("  - 当前阶段: %s" % ("出牌阶段" if current_phase == GamePhase.PLAYING else "其他"))
+	print("  - 手牌数: %d张" % ai_player.hand.size())
 
 	# 安全检查：确保在出牌阶段才能出牌
 	if current_phase != GamePhase.PLAYING:
-		print("警告：当前不是出牌阶段，AI不能出牌！")
+		print("  ⚠ 警告：当前不是出牌阶段，AI不能出牌！")
 		return
 
+	# 更新所有手牌的主牌状态
 	for card in ai_player.hand:
 		card.set_trump(trump_suit, current_level)
-	
-	var cards_to_play: Array = []
-	
+
+	var cards_to_play: Array[Card] = []
+
 	if current_trick.is_empty():
 		# 首家出牌：出最大的单张
 		if ai_player.hand.size() > 0:
 			var sorted_hand = ai_player.hand.duplicate()
-			sorted_hand.sort_custom(func(a, b): 
+			sorted_hand.sort_custom(func(a, b):
 				return a.compare_to(b, trump_suit, current_level) > 0
 			)
-			cards_to_play = [sorted_hand[0]]
+			cards_to_play.append(sorted_hand[0])
+			print("  - AI选择首家出牌: %s" % sorted_hand[0].get_card_name())
 	else:
 		# 跟牌
 		var lead_pattern = current_trick[0]["pattern"]
 		var valid_plays = GameRules.get_valid_follow_cards(ai_player.hand, lead_pattern, trump_suit, current_level)
-		
+
 		if valid_plays.size() > 0:
-			cards_to_play = valid_plays[0]
+			for card in valid_plays[0]:
+				cards_to_play.append(card)
+			print("  - AI选择跟牌: %d张" % cards_to_play.size())
 		elif ai_player.hand.size() >= lead_pattern.length:
 			var sorted_hand = ai_player.hand.duplicate()
-			sorted_hand.sort_custom(func(a, b): 
+			sorted_hand.sort_custom(func(a, b):
 				return a.compare_to(b, trump_suit, current_level) < 0
 			)
-			cards_to_play = sorted_hand.slice(0, lead_pattern.length)
-	
-	if cards_to_play.size() > 0:
-		for card in cards_to_play:
-			ai_player.hand.erase(card)
-			if card.get_parent() == ai_player.hand_container:
-				ai_player.hand_container.remove_child(card)
-		
-		ai_player.update_hand_display()
-		
-		var cards_array: Array[Card] = []
-		for card in cards_to_play:
-			cards_array.append(card)
-		
-		show_played_cards(ai_player.player_id, cards_array)
-		
-		var pattern = GameRules.identify_pattern(cards_array, trump_suit, current_level)
-		current_trick.append({
-			"player_id": ai_player.player_id,
-			"cards": cards_array,
-			"pattern": pattern
-		})
+			for i in range(lead_pattern.length):
+				cards_to_play.append(sorted_hand[i])
+			print("  - AI选择垫牌: %d张" % cards_to_play.size())
 
-		if current_trick.size() == 4:
-			await get_tree().create_timer(1.0).timeout
-			evaluate_trick()
+	if cards_to_play.size() > 0:
+		# 使用统一的出牌函数
+		if execute_play_cards(ai_player, cards_to_play):
+			var pattern = GameRules.identify_pattern(cards_to_play, trump_suit, current_level)
+			current_trick.append({
+				"player_id": ai_player.player_id,
+				"cards": cards_to_play,
+				"pattern": pattern
+			})
+
+			if current_trick.size() == 4:
+				await get_tree().create_timer(1.0).timeout
+				evaluate_trick()
+			else:
+				next_player_turn()
 		else:
-			next_player_turn()
+			print("  ⚠ AI出牌失败！")
+	else:
+		print("  ⚠ AI没有可出的牌！")
 
 func evaluate_trick():
 	"""评估本轮出牌，判定赢家"""
