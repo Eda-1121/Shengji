@@ -118,6 +118,12 @@ func start_new_round():
 	deck.create_deck()
 	print("  - 创建牌堆: %d 副牌, 共 %d 张牌" % [num_decks, deck.cards.size()])
 
+	# 验证：打印前5张牌的对象ID
+	print("  - 验证牌堆中的卡牌对象ID（前5张）:")
+	for i in range(min(5, deck.cards.size())):
+		var card = deck.cards[i]
+		print("    [%d] %s 对象ID=%s" % [i, card.get_card_name(), card.get_instance_id()])
+
 	# ==========================================
 	# 步骤2: 洗牌
 	# ==========================================
@@ -214,6 +220,12 @@ func start_dealing_cards():
 		await get_tree().create_timer(0.1).timeout
 
 	# 发牌完成
+	print("\n[发牌完成] 验证玩家1手牌对象ID（前5张）:")
+	var human_player = players[0]
+	for i in range(min(5, human_player.hand.size())):
+		var card = human_player.hand[i]
+		print("  [%d] %s 对象ID=%s, parent=%s" % [i, card.get_card_name(), card.get_instance_id(), card.get_parent().name if card.get_parent() else "无"])
+
 	finish_dealing()
 
 func check_and_handle_bidding(player: Player, latest_card: Card):

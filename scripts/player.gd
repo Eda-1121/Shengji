@@ -47,11 +47,19 @@ func center_hand_container():
 
 func receive_cards(cards: Array[Card]):
 	for card in cards:
+		# 验证：记录收到的卡牌对象ID
+		if player_type == PlayerType.HUMAN and hand.size() < 3:  # 只在前3张时打印
+			print("[receive_cards] %s 收到卡牌: %s 对象ID=%s" % [player_name, card.get_card_name(), card.get_instance_id()])
+
 		hand.append(card)
 
 		if card.get_parent():
 			card.get_parent().remove_child(card)
 		hand_container.add_child(card)
+
+		# 验证：确认卡牌已添加到hand_container
+		if player_type == PlayerType.HUMAN and hand.size() <= 3:
+			print("  → 已添加到hand数组，大小=%d，已添加到hand_container，parent=%s" % [hand.size(), card.get_parent().name if card.get_parent() else "无"])
 
 		# 不在这里设置visible，由调用者控制
 		# card.visible = true
@@ -206,6 +214,29 @@ func update_hand_display(animate: bool = true):
 
 	print("清理后 - hand_container子节点数：", hand_container.get_child_count())
 
+	# 验证：检查hand数组和hand_container的一致性
+	print("\n[一致性验证]")
+	print("  - hand数组中的卡牌是否都在hand_container中？")
+	for i in range(min(3, hand.size())):  # 只检查前3张
+		var card = hand[i]
+		var in_container = (card.get_parent() == hand_container)
+		print("    [%d] %s (对象ID=%s) parent=%s in_container=%s" % [
+			i, card.get_card_name(), card.get_instance_id(),
+			card.get_parent().name if card.get_parent() else "无",
+			in_container
+		])
+
+	print("  - hand_container中的卡牌是否都在hand数组中？")
+	var container_child_count = 0
+	for child in hand_container.get_children():
+		if child is Card:
+			if container_child_count < 3:  # 只打印前3个
+				var in_hand = hand.has(child)
+				print("    [%d] %s (对象ID=%s) in_hand=%s" % [
+					container_child_count, child.get_card_name(), child.get_instance_id(), in_hand
+				])
+			container_child_count += 1
+
 	# 第三步：重新排列所有手牌位置（居中对齐）
 	# 计算居中偏移量
 	var total_width = 0
@@ -278,9 +309,25 @@ func _on_card_clicked(card: Card):
 	# 检查卡牌是否在手牌中（防止已出的牌被点击）
 	if not hand.has(card):
 		print("  ⚠ 警告：尝试选择不在手牌中的卡牌！")
-		print("  - 手牌中的卡牌:")
+		print("  - 点击的卡牌: %s (对象ID=%s)" % [card.get_card_name(), card.get_instance_id()])
+		print("  - 手牌数组大小: %d" % hand.size())
+		print("  - 手牌中的所有卡牌:")
 		for i in range(hand.size()):
-			print("    [%d] %s (对象ID=%s)" % [i, hand[i].get_card_name(), hand[i].get_instance_id()])
+			var h_card = hand[i]
+			var same_name = (h_card.get_card_name() == card.get_card_name())
+			var same_id = (h_card.get_instance_id() == card.get_instance_id())
+			print("    [%d] %s (对象ID=%s) 名字相同=%s 对象ID相同=%s" % [
+				i, h_card.get_card_name(), h_card.get_instance_id(), same_name, same_id
+			])
+		print("  - 检查hand_container中的卡牌:")
+		var container_index = 0
+		for child in hand_container.get_children():
+			if child is Card:
+				var is_clicked_card = (child.get_instance_id() == card.get_instance_id())
+				print("    [%d] %s (对象ID=%s) 是点击的卡牌=%s" % [
+					container_index, child.get_card_name(), child.get_instance_id(), is_clicked_card
+				])
+				container_index += 1
 		return
 
 	if card.is_selected:
