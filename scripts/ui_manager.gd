@@ -137,12 +137,12 @@ func create_ui():
 	add_child(selected_count_label)
 	
 	# =====================================
-	# 出牌按钮（居中，在牌的上方）
+	# 出牌按钮（居中，在手牌上方，出牌区下方）
 	# =====================================
 	var button_container = HBoxContainer.new()
 	# 居中显示：屏幕宽度1280，按钮宽120，居中位置 (1280-120)/2 = 580
-	# 按钮位置调整到y=470，与手牌保持适当距离
-	button_container.position = Vector2(580, 470)
+	# 按钮位置调整到y=530，在手牌上方，出牌区(y=560)下方
+	button_container.position = Vector2(580, 530)
 	button_container.add_theme_constant_override("separation", 20)
 	add_child(button_container)
 
@@ -162,7 +162,7 @@ func create_ui():
 	bury_button.pressed.connect(_on_bury_button_pressed)
 	bury_button.visible = false
 	# 埋底按钮独立定位，居中显示
-	bury_button.position = Vector2(570, 470)  # 与出牌按钮相同高度
+	bury_button.position = Vector2(570, 530)  # 与出牌按钮相同高度
 	add_child(bury_button)
 	
 	# =====================================
@@ -203,12 +203,12 @@ func create_phase2_ui():
 		add_child(game_over_ui)
 
 func create_player_avatars():
-	"""创建4个玩家的头像框"""
+	"""创建4个玩家的头像框 - 与玩家位置对应"""
 	var avatar_positions = [
-		Vector2(540, 620),
-		Vector2(10, 240),
-		Vector2(540, 60),
-		Vector2(1150, 320)
+		Vector2(540, 680),   # 玩家1（不显示）
+		Vector2(10, 320),    # 玩家2 - 左侧垂直居中
+		Vector2(540, 10),    # 玩家3 - 上方水平居中
+		Vector2(1150, 320)   # 玩家4 - 右侧垂直居中
 	]
 	
 	var player_names = ["玩家1", "玩家2", "玩家3", "玩家4"]

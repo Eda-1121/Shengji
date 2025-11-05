@@ -35,7 +35,7 @@ var total_rounds_played: int = 0
 
 # 出牌区域 - 围绕屏幕中心(640, 360)的十字形布局，适配1280x720屏幕
 var play_area_positions = [
-	Vector2(640, 500),   # 玩家1（人类）- 下方中央
+	Vector2(640, 560),   # 玩家1（人类）- 下方中央（向下移动，避免与按钮重叠）
 	Vector2(380, 360),   # 玩家2（AI）- 左侧中央
 	Vector2(640, 220),   # 玩家3（AI）- 上方中央
 	Vector2(900, 360)    # 玩家4（AI）- 右侧中央
@@ -60,12 +60,12 @@ func initialize_game():
 	deck = Deck.new(num_decks)
 	deck.create_deck()
 
-	# 玩家位置：玩家1在下方居中，其他AI玩家位置不变
+	# 玩家位置：围绕屏幕中心(640, 360)对称布局
 	var player_positions = [
-		Vector2(200, 580),   # 玩家1（人类）- 下方居中，向下调整
-		Vector2(50, 280),    # 玩家2（AI）- 左侧
-		Vector2(100, 50),    # 玩家3（AI）- 上方
-		Vector2(1050, 280)   # 玩家4（AI）- 右侧
+		Vector2(200, 640),   # 玩家1（人类）- 下方，向下移动避免与按钮重叠
+		Vector2(50, 360),    # 玩家2（AI）- 左侧，垂直居中与玩家4对齐
+		Vector2(640, 50),    # 玩家3（AI）- 上方，水平居中与玩家1对齐
+		Vector2(1050, 360)   # 玩家4（AI）- 右侧，垂直居中与玩家2对齐
 	]
 	
 	for i in 4:
