@@ -27,6 +27,24 @@ func _ready():
 	hand_container.name = "HandContainer"
 	add_child(hand_container)
 
+func center_hand_container():
+	"""将手牌容器居中显示在屏幕中央（仅对人类玩家）"""
+	if player_type == PlayerType.HUMAN:
+		# 获取屏幕大小
+		var viewport_size = get_viewport_rect().size
+		var screen_center_x = viewport_size.x / 2.0
+
+		# hand_container 的位置是相对于 player 的
+		# 要让手牌显示在屏幕中央，需要偏移
+		# 例如：屏幕中心是640，玩家位置是200，所以需要偏移440
+		hand_container.position.x = screen_center_x - position.x
+
+		print("手牌容器居中设置：")
+		print("  - 屏幕宽度: %d" % viewport_size.x)
+		print("  - 屏幕中心X: %d" % screen_center_x)
+		print("  - 玩家位置X: %d" % position.x)
+		print("  - hand_container偏移X: %d" % hand_container.position.x)
+
 func receive_cards(cards: Array[Card]):
 	for card in cards:
 		hand.append(card)

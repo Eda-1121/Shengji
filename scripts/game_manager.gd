@@ -77,7 +77,11 @@ func initialize_game():
 		player.position = player_positions[i]
 		players.append(player)
 		add_child(player)
-	
+
+		# 对人类玩家，将手牌容器居中显示在屏幕中央
+		if player.player_type == Player.PlayerType.HUMAN:
+			player.center_hand_container()
+
 	start_new_round()
 
 func start_new_round():
