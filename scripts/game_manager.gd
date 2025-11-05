@@ -925,6 +925,7 @@ func execute_play_cards(player: Player, cards_to_play: Array[Card]) -> bool:
 
 	print("\n[步骤5] 更新手牌显示")
 	player.update_hand_display(false)  # 不使用动画，避免异步问题
+	print("[步骤5] update_hand_display返回")  # 添加这行确认函数返回
 
 	print("\n[步骤6] 最终状态")
 	print("  - hand数组大小: %d" % player.hand.size())
