@@ -112,14 +112,14 @@ func create_ui():
 	team2_container.add_child(team2_score_label)
 	
 	# =====================================
-	# 回合提示标签
+	# 回合提示标签（左上角，info_panel下方）
 	# =====================================
 	turn_label = Label.new()
-	turn_label.position = Vector2(400, 10)
-	turn_label.size = Vector2(480, 40)
+	turn_label.position = Vector2(10, 120)  # info_panel下方（y=10+100+10）
+	turn_label.size = Vector2(280, 35)  # 与info_panel同宽
 	turn_label.text = "轮到你出牌"
-	turn_label.add_theme_font_size_override("font_size", 22)
-	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	turn_label.add_theme_font_size_override("font_size", 20)
+	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT  # 左对齐
 	turn_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(turn_label)
 	
