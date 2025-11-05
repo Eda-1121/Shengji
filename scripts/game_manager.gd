@@ -1183,7 +1183,19 @@ func evaluate_trick():
 				player.hand.erase(card)
 				print("    → 已强制从hand数组移除")
 
-			if is_instance_valid(card) and card.get_parent():
+			# 在释放前彻底隐藏和禁用卡牌
+			if is_instance_valid(card):
+				card.visible = false  # 立即隐藏
+				card.is_selectable = false  # 禁用交互
+				card.z_index = -1000  # 降到最低层，防止hover时显示
+				print("    → 已隐藏并禁用")
+
+				# 从父节点移除
+				if card.get_parent():
+					card.get_parent().remove_child(card)
+					print("    → 已从父节点移除")
+
+				# 释放卡牌对象
 				card.queue_free()
 				print("    → 已调用queue_free()")
 
