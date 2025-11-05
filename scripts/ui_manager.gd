@@ -36,71 +36,79 @@ func _ready():
 
 func create_ui():
 	# =====================================
-	# 左上角统一信息面板
+	# 左上角统一信息面板（紧凑型横向布局）
 	# =====================================
 	info_panel = Panel.new()
 	info_panel.position = Vector2(10, 10)
-	info_panel.size = Vector2(300, 220)
+	info_panel.size = Vector2(280, 100)  # 调整为更紧凑的大小
 	info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(info_panel)
-	
+
 	var info_container = VBoxContainer.new()
-	info_container.position = Vector2(15, 10)
-	info_container.add_theme_constant_override("separation", 5)
+	info_container.position = Vector2(10, 8)
+	info_container.add_theme_constant_override("separation", 8)
 	info_panel.add_child(info_container)
-	
-	# 当前级别
+
+	# 第一行：当前级别 + 主花色（横向排列）
+	var level_trump_container = HBoxContainer.new()
+	level_trump_container.add_theme_constant_override("separation", 15)
+	info_container.add_child(level_trump_container)
+
 	level_label = Label.new()
-	level_label.text = "当前级别: 2"
-	level_label.add_theme_font_size_override("font_size", 22)
-	info_container.add_child(level_label)
-	
-	# 主花色
+	level_label.text = "级别: 2"
+	level_label.add_theme_font_size_override("font_size", 20)
+	level_label.custom_minimum_size = Vector2(75, 0)  # 固定宽度，确保2位数时不影响布局
+	level_trump_container.add_child(level_label)
+
 	trump_label = Label.new()
-	trump_label.text = "主花色: ♠"
-	trump_label.add_theme_font_size_override("font_size", 22)
-	info_container.add_child(trump_label)
-	
+	trump_label.text = "主: ♠"
+	trump_label.add_theme_font_size_override("font_size", 20)
+	level_trump_container.add_child(trump_label)
+
 	# 分割线
-	var separator1 = HSeparator.new()
-	separator1.custom_minimum_size = Vector2(270, 2)
-	info_container.add_child(separator1)
-	
-	# 队伍1标题和分数
-	var team1_container = VBoxContainer.new()
-	team1_container.add_theme_constant_override("separation", 2)
-	info_container.add_child(team1_container)
-	
+	var separator = HSeparator.new()
+	separator.custom_minimum_size = Vector2(260, 2)
+	info_container.add_child(separator)
+
+	# 第二行：队伍得分（横向排列）
+	var teams_container = HBoxContainer.new()
+	teams_container.add_theme_constant_override("separation", 20)
+	info_container.add_child(teams_container)
+
+	# 队伍1
+	var team1_container = HBoxContainer.new()
+	team1_container.add_theme_constant_override("separation", 5)
+	teams_container.add_child(team1_container)
+
 	var team1_title = Label.new()
-	team1_title.text = "队伍1"
-	team1_title.add_theme_font_size_override("font_size", 20)
+	team1_title.text = "队1:"
+	team1_title.add_theme_font_size_override("font_size", 18)
 	team1_title.add_theme_color_override("font_color", Color(0.3, 0.8, 0.3))
 	team1_container.add_child(team1_title)
-	
+
 	team1_score_label = Label.new()
-	team1_score_label.text = "得分: 0"
-	team1_score_label.add_theme_font_size_override("font_size", 24)
+	team1_score_label.text = "0"
+	team1_score_label.add_theme_font_size_override("font_size", 22)
+	team1_score_label.add_theme_color_override("font_color", Color(0.3, 0.8, 0.3))
+	team1_score_label.custom_minimum_size = Vector2(40, 0)  # 固定宽度，避免分数变化时布局跳动
 	team1_container.add_child(team1_score_label)
-	
-	# 分割线
-	var separator2 = HSeparator.new()
-	separator2.custom_minimum_size = Vector2(270, 2)
-	info_container.add_child(separator2)
-	
-	# 队伍2标题和分数
-	var team2_container = VBoxContainer.new()
-	team2_container.add_theme_constant_override("separation", 2)
-	info_container.add_child(team2_container)
-	
+
+	# 队伍2
+	var team2_container = HBoxContainer.new()
+	team2_container.add_theme_constant_override("separation", 5)
+	teams_container.add_child(team2_container)
+
 	var team2_title = Label.new()
-	team2_title.text = "队伍2"
-	team2_title.add_theme_font_size_override("font_size", 20)
+	team2_title.text = "队2:"
+	team2_title.add_theme_font_size_override("font_size", 18)
 	team2_title.add_theme_color_override("font_color", Color(0.8, 0.3, 0.3))
 	team2_container.add_child(team2_title)
-	
+
 	team2_score_label = Label.new()
-	team2_score_label.text = "得分: 0"
-	team2_score_label.add_theme_font_size_override("font_size", 24)
+	team2_score_label.text = "0"
+	team2_score_label.add_theme_font_size_override("font_size", 22)
+	team2_score_label.add_theme_color_override("font_color", Color(0.8, 0.3, 0.3))
+	team2_score_label.custom_minimum_size = Vector2(40, 0)  # 固定宽度
 	team2_container.add_child(team2_score_label)
 	
 	# =====================================
@@ -257,14 +265,14 @@ func update_level(level: int):
 		9: "9", 10: "10", 11: "J", 12: "Q", 13: "K", 14: "A"
 	}
 	var level_str = level_names.get(level, str(level))
-	level_label.text = "当前级别: %s" % level_str
+	level_label.text = "级别: %s" % level_str
 
 func update_trump_suit(suit_symbol: String):
-	trump_label.text = "主花色: %s" % suit_symbol
+	trump_label.text = "主: %s" % suit_symbol
 
 func update_team_scores(team1_score: int, team2_score: int):
-	team1_score_label.text = "得分: %d" % team1_score
-	team2_score_label.text = "得分: %d" % team2_score
+	team1_score_label.text = "%d" % team1_score
+	team2_score_label.text = "%d" % team2_score
 
 func update_turn_message(message: String):
 	turn_label.text = message
