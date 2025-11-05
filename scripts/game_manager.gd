@@ -975,6 +975,19 @@ func execute_play_cards(player: Player, cards_to_play: Array[Card]) -> bool:
 	else:
 		print("  ⚠ 同步验证失败：hand数组 %d 张，UI显示 %d 张" % [player.hand.size(), ui_card_count])
 
+	# 验证：确认出的牌已经不在hand数组中
+	print("\n[步骤7] 验证出的牌已从hand数组移除:")
+	var cards_still_in_hand = []
+	for card in cards_to_play:
+		if player.hand.has(card):
+			cards_still_in_hand.append(card)
+			print("  ⚠⚠⚠ 错误：%s (对象ID=%s) 仍在hand数组中！" % [card.get_card_name(), card.get_instance_id()])
+
+	if cards_still_in_hand.is_empty():
+		print("  ✓ 验证通过：所有出的牌都已从hand数组移除")
+	else:
+		print("  ⚠⚠⚠ 发现 %d 张牌仍在hand数组中，这会导致手牌增多bug！" % cards_still_in_hand.size())
+
 	print("=".repeat(60))
 	print("出牌成功，剩余手牌：%d张\n" % player.hand.size())
 	return true
@@ -1151,12 +1164,41 @@ func evaluate_trick():
 	await get_tree().create_timer(2.0).timeout
 
 	# 清理本轮出的牌
+	print("\n[清理出牌区]")
 	for play in current_trick:
+		var player = players[play["player_id"]]
+		print("  - %s 出的牌:" % player.player_name)
 		for card in play["cards"]:
+			print("    清理卡牌: %s (对象ID=%s, parent=%s)" % [
+				card.get_card_name(),
+				card.get_instance_id(),
+				card.get_parent().name if card.get_parent() else "无"
+			])
+
+			# 检查这张卡牌是否还在玩家的hand数组中（不应该在）
+			if player.hand.has(card):
+				print("    ⚠⚠⚠ 严重错误：卡牌 %s 还在玩家 %s 的hand数组中！" % [card.get_card_name(), player.player_name])
+				print("    ⚠⚠⚠ 这会导致手牌增多的bug！")
+				# 强制从hand数组中移除
+				player.hand.erase(card)
+				print("    → 已强制从hand数组移除")
+
 			if is_instance_valid(card) and card.get_parent():
 				card.queue_free()
+				print("    → 已调用queue_free()")
 
 	current_trick.clear()
+	print("[清理完成] current_trick已清空")
+
+	# 验证所有玩家的hand数组大小
+	print("\n[验证] 清理后各玩家手牌数:")
+	for i in range(4):
+		var p = players[i]
+		print("  %s: hand数组=%d张, hand_container子节点=%d个" % [
+			p.player_name,
+			p.hand.size(),
+			p.hand_container.get_child_count()
+		])
 
 	# 检查是否所有牌都出完了
 	if players[0].get_hand_size() == 0:
