@@ -228,12 +228,20 @@ func _on_card_clicked(card: Card):
 	if player_type != PlayerType.HUMAN:
 		return
 
+	print("\n[卡牌点击] 玩家点击了卡牌")
+	print("  - 卡牌信息: %s (suit=%d, rank=%d, 对象ID=%s)" % [card.get_card_name(), card.suit, card.rank, card.get_instance_id()])
+	print("  - 当前是否选中: %s" % ("是" if card.is_selected else "否"))
+
 	# 检查卡牌是否在手牌中（防止已出的牌被点击）
 	if not hand.has(card):
-		print("警告：尝试选择不在手牌中的卡牌 ", card)
+		print("  ⚠ 警告：尝试选择不在手牌中的卡牌！")
+		print("  - 手牌中的卡牌:")
+		for i in range(hand.size()):
+			print("    [%d] %s (对象ID=%s)" % [i, hand[i].get_card_name(), hand[i].get_instance_id()])
 		return
 
 	if card.is_selected:
+		print("  - 操作：取消选中")
 		card.set_selected(false)
 		selected_cards.erase(card)
 		# 恢复原始z_index
@@ -241,10 +249,17 @@ func _on_card_clicked(card: Card):
 		if index >= 0:
 			card.z_index = index
 	else:
+		print("  - 操作：选中")
 		card.set_selected(true)
 		selected_cards.append(card)
 		# 将选中的卡牌置于最前面
 		card.z_index = 1000 + selected_cards.size()
+
+	print("  - 当前已选中卡牌数量: %d" % selected_cards.size())
+	print("  - 已选中的卡牌:")
+	for i in range(selected_cards.size()):
+		var c = selected_cards[i]
+		print("    [%d] %s (suit=%d, rank=%d, 对象ID=%s)" % [i, c.get_card_name(), c.suit, c.rank, c.get_instance_id()])
 
 	# 发出选牌变化信号
 	selection_changed.emit(selected_cards.size())

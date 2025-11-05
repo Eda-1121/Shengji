@@ -79,11 +79,11 @@ func _setup_area2d():
 
 		collision_shape = CollisionShape2D.new()
 		var shape = RectangleShape2D.new()
-		# 碰撞区域只覆盖卡牌左侧可见部分（根据CARD_SCALE调整）
-		shape.size = Vector2(35 * CARD_SCALE, 90 * CARD_SCALE)
+		# 碰撞区域只覆盖卡牌左侧可见部分，避免与相邻卡牌重叠（卡牌间距35px）
+		shape.size = Vector2(30 * CARD_SCALE, 90 * CARD_SCALE)
 		collision_shape.shape = shape
-		# 将碰撞形状向左偏移，使其覆盖左侧
-		collision_shape.position = Vector2(-12.5 * CARD_SCALE, 0)
+		# 将碰撞形状向左偏移，使其覆盖左侧可见部分，与相邻卡牌保持间隙
+		collision_shape.position = Vector2(-20 * CARD_SCALE, 0)
 		area_2d.add_child(collision_shape)
 
 		area_2d.input_event.connect(_on_area_input_event)

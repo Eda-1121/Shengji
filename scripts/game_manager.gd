@@ -333,12 +333,15 @@ func finish_dealing():
 	print("\n[步骤7] 进入埋底阶段")
 	print("  - 庄家 %s 将收到8张底牌" % players[dealer_index].player_name)
 
+	# 设置埋底阶段（重要：在任何埋底操作之前设置，防止AI误出牌）
+	current_phase = GamePhase.BURYING
+
 	if players[dealer_index].player_type == Player.PlayerType.HUMAN:
 		print("  - 庄家是人类玩家，等待手动埋底")
 		start_burying_phase()
 	else:
 		print("  - 庄家是AI玩家，自动埋底")
-		ai_bury_bottom()
+		await ai_bury_bottom()
 
 # =====================================
 # 叫牌系统
@@ -612,10 +615,11 @@ func start_burying_phase():
 	print("=== 埋底阶段 ===")
 	print("=".repeat(60))
 	current_phase = GamePhase.BURYING
+	print("  - 游戏阶段已设置为：BURYING")
 
 	var dealer = players[dealer_index]
 	print("\n[埋底] 庄家收到底牌")
-	print("  - 庄家: %s" % dealer.player_name)
+	print("  - 庄家: %s (player_id=%d)" % [dealer.player_name, dealer.player_id])
 	print("  - 当前手牌数: %d张" % dealer.hand.size())
 	print("  - 准备发放底牌: 8张")
 
@@ -787,11 +791,24 @@ func _on_play_cards_pressed():
 			ui_manager.show_center_message("请先选择要出的牌!", 1.5)
 		return
 
+	print("\n[出牌按钮] 玩家点击出牌按钮")
+	print("  - 已选中卡牌数量: %d" % human_player.selected_cards.size())
+	print("  - 已选中的卡牌列表:")
+	for i in range(human_player.selected_cards.size()):
+		var c = human_player.selected_cards[i]
+		print("    [%d] %s (suit=%d, rank=%d, 对象ID=%s)" % [i, c.get_card_name(), c.suit, c.rank, c.get_instance_id()])
+
 	# 先复制一份要出的牌，避免后续操作影响
 	var cards_to_play: Array[Card] = []
 	for card in human_player.selected_cards:
 		card.set_trump(trump_suit, current_level)
 		cards_to_play.append(card)
+
+	print("  - 复制后的cards_to_play数量: %d" % cards_to_play.size())
+	print("  - cards_to_play列表:")
+	for i in range(cards_to_play.size()):
+		var c = cards_to_play[i]
+		print("    [%d] %s (suit=%d, rank=%d, 对象ID=%s)" % [i, c.get_card_name(), c.suit, c.rank, c.get_instance_id()])
 
 	var pattern = GameRules.identify_pattern(cards_to_play, trump_suit, current_level)
 
@@ -999,13 +1016,18 @@ func show_played_cards(player_id: int, cards: Array):
 
 func next_player_turn():
 	"""下一个玩家"""
+	# 安全检查：确保在出牌阶段才能调用
+	if current_phase != GamePhase.PLAYING:
+		print("  ⚠ 警告：当前不是出牌阶段(%s)，不能调用next_player_turn！" % ["DEALING_AND_BIDDING", "BURYING", "PLAYING", "SCORING"][current_phase])
+		return
+
 	current_player_index = (current_player_index + 1) % 4
 	var current_player = players[current_player_index]
-	
+
 	if ui_manager:
 		ui_manager.update_turn_message("轮到 %s 出牌" % current_player.player_name)
 		ui_manager.highlight_current_player(current_player_index)
-	
+
 	if current_player.player_type == Player.PlayerType.AI:
 		await get_tree().create_timer(1.5).timeout
 		ai_play_turn(current_player)
