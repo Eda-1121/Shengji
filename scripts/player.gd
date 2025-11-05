@@ -194,19 +194,11 @@ func update_hand_display(animate: bool = true):
 		var in_selected_array = selected_cards.has(card)
 		var has_selected_flag = card.is_selected
 		if in_selected_array != has_selected_flag:
-			print("  ⚠ 不一致！卡牌 %s: in_array=%s, flag=%s" % [card.get_card_name(), in_selected_array, has_selected_flag])
-			# 修复：以selected_cards数组为准
-			if in_selected_array and not has_selected_flag:
-				print("    → 修复：设置is_selected=true")
-				card.is_selected = true
-				if card.sprite:
-					card.sprite.modulate = Color(1.3, 1.3, 1.0)
-			elif not in_selected_array and has_selected_flag:
-				print("    → 修复：设置is_selected=false，从selected_cards移除")
-				card.is_selected = false
-				if card.sprite:
-					card.sprite.modulate = Color.WHITE
-				selected_cards.erase(card)
+			print("  ⚠ 不一致！卡牌 %s (对象ID=%s): in_array=%s, flag=%s" % [
+				card.get_card_name(), card.get_instance_id(), in_selected_array, has_selected_flag
+			])
+			print("    → 不自动修复，保留当前状态")
+			# 移除自动修复逻辑，避免破坏用户选择
 
 		# 确保卡牌颜色正常（清除任何残留的高亮）
 		if card.sprite and not card.is_selected:
