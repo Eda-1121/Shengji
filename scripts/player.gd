@@ -163,10 +163,16 @@ func update_hand_display(animate: bool = true):
 
 	print("清理后 - hand_container子节点数：", hand_container.get_child_count())
 
-	# 第三步：重新排列所有手牌位置
+	# 第三步：重新排列所有手牌位置（居中对齐）
+	# 计算居中偏移量
+	var total_width = 0
+	if hand.size() > 1:
+		total_width = (hand.size() - 1) * card_spacing
+	var start_offset = -total_width / 2.0  # 居中对齐的起始偏移量
+
 	for i in range(hand.size()):
 		var card = hand[i]
-		var target_pos = Vector2(i * card_spacing, 0)
+		var target_pos = Vector2(start_offset + i * card_spacing, 0)
 
 		# 保存选中状态
 		var was_selected = card.is_selected
