@@ -81,9 +81,9 @@ func initialize_game():
 	start_new_round()
 
 func start_new_round():
-	print("\n" + "="*60)
+	print("\n" + "=".repeat(60))
 	print("=== 开始新一局 (第 %d 局) ===" % [total_rounds_played + 1])
-	print("="*60)
+	print("=".repeat(60))
 	total_rounds_played += 1
 
 	# ==========================================
@@ -279,9 +279,9 @@ func check_and_handle_bidding(player: Player, latest_card: Card):
 
 func finish_dealing():
 	"""发牌完成，进行最后一次叫牌机会，然后确定主牌"""
-	print("\n" + "="*60)
+	print("\n" + "=".repeat(60))
 	print("=== 发牌完成 ===")
-	print("="*60)
+	print("=".repeat(60))
 
 	if ui_manager:
 		ui_manager.update_turn_message("发牌完成，最后叫牌机会...")
@@ -604,9 +604,9 @@ func get_suit_name(suit: Card.Suit) -> String:
 
 func start_burying_phase():
 	"""开始埋底阶段"""
-	print("\n" + "="*60)
+	print("\n" + "=".repeat(60))
 	print("=== 埋底阶段 ===")
-	print("="*60)
+	print("=".repeat(60))
 	current_phase = GamePhase.BURYING
 
 	var dealer = players[dealer_index]
@@ -711,9 +711,9 @@ func ai_bury_bottom():
 
 func start_playing_phase():
 	"""开始出牌阶段"""
-	print("\n" + "="*60)
+	print("\n" + "=".repeat(60))
 	print("=== 出牌阶段 ===")
-	print("="*60)
+	print("=".repeat(60))
 	current_phase = GamePhase.PLAYING
 
 	print("\n[出牌阶段] 初始化")
@@ -971,7 +971,7 @@ func ai_play_turn(ai_player: Player):
 
 func evaluate_trick():
 	"""评估本轮出牌，判定赢家"""
-	print("\n" + "-"*60)
+	print("\n" + "-".repeat(60))
 	print("[本轮结算]")
 
 	# 显示本轮所有人的出牌
@@ -1021,9 +1021,9 @@ func evaluate_trick():
 
 	# 检查是否所有牌都出完了
 	if players[0].get_hand_size() == 0:
-		print("\n" + "="*60)
+		print("\n" + "=".repeat(60))
 		print("=== 所有牌已出完，结算底牌 ===")
-		print("="*60)
+		print("=".repeat(60))
 		await get_tree().create_timer(1.0).timeout
 
 		var bottom_points = GameRules.calculate_points(bottom_cards)
@@ -1076,9 +1076,9 @@ func end_round():
 	"""本局结束，计算升级"""
 	current_phase = GamePhase.SCORING
 
-	print("\n" + "="*60)
+	print("\n" + "=".repeat(60))
 	print("=== 本局结束，计算升级 ===")
-	print("="*60)
+	print("=".repeat(60))
 
 	var dealer_team = current_bid["team"]  # 庄家队（叫牌成功的队）
 	var attacker_team = 1 - dealer_team    # 对手队（闲家）
