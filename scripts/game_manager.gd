@@ -864,25 +864,45 @@ func execute_play_cards(player: Player, cards_to_play: Array[Card]) -> bool:
 	4. 更新手牌显示
 	"""
 	if cards_to_play.is_empty():
-		print("错误：没有要出的牌")
+		print("  ⚠ 错误：没有要出的牌")
 		return false
 
-	print("\n[出牌] %s 出 %d 张牌" % [player.player_name, cards_to_play.size()])
+	print("\n" + "=".repeat(60))
+	print("[出牌流程] %s 出 %d 张牌" % [player.player_name, cards_to_play.size()])
+	print("=".repeat(60))
 
-	# 1. 从手牌中移除，并清理选择状态
+	# 输出要出的牌
+	for card in cards_to_play:
+		print("  → 准备出牌: %s" % card.get_card_name())
+
+	print("\n[步骤1] 出牌前状态")
+	print("  - hand数组大小: %d" % player.hand.size())
+	print("  - hand_container子节点数: %d" % player.hand_container.get_child_count())
+	print("  - selected_cards大小: %d" % player.selected_cards.size())
+
+	# 验证所有要出的牌都在hand中
 	for card in cards_to_play:
 		if not player.hand.has(card):
-			print("错误：卡牌不在手牌中")
+			print("  ⚠ 错误：卡牌 %s 不在手牌中！" % card.get_card_name())
 			return false
 
+	print("\n[步骤2] 从hand数组和hand_container移除卡牌")
+	# 从手牌中移除，并清理选择状态
+	for card in cards_to_play:
 		# 取消选择状态
 		if card.is_selected:
 			card.is_selected = false
 			if card.sprite:
 				card.sprite.modulate = Color.WHITE
+			print("  - 清除选中状态: %s" % card.get_card_name())
 
 		# 从手牌数组移除
 		player.hand.erase(card)
+
+		# 从UI容器移除（关键！必须在这里移除）
+		if card.get_parent() == player.hand_container:
+			player.hand_container.remove_child(card)
+			print("  - 从hand_container移除: %s" % card.get_card_name())
 
 		# 从选中列表移除
 		if player.selected_cards.has(card):
@@ -895,13 +915,34 @@ func execute_play_cards(player: Player, cards_to_play: Array[Card]) -> bool:
 	# 清空选中列表
 	player.selected_cards.clear()
 
-	# 2. 显示出的牌到出牌区域（这里会从hand_container移除并添加到game_manager）
+	print("\n[步骤3] 移除后状态")
+	print("  - hand数组大小: %d" % player.hand.size())
+	print("  - hand_container子节点数: %d" % player.hand_container.get_child_count())
+	print("  - selected_cards大小: %d" % player.selected_cards.size())
+
+	print("\n[步骤4] 显示出的牌到出牌区域")
 	show_played_cards(player.player_id, cards_to_play)
 
-	# 3. 更新手牌显示
-	player.update_hand_display(true)
+	print("\n[步骤5] 更新手牌显示")
+	player.update_hand_display(false)  # 不使用动画，避免异步问题
 
-	print("  - 出牌成功，剩余手牌：%d张" % player.hand.size())
+	print("\n[步骤6] 最终状态")
+	print("  - hand数组大小: %d" % player.hand.size())
+	print("  - hand_container子节点数: %d" % player.hand_container.get_child_count())
+
+	# 验证hand和hand_container同步
+	var ui_card_count = 0
+	for child in player.hand_container.get_children():
+		if child is Card:
+			ui_card_count += 1
+
+	if ui_card_count == player.hand.size():
+		print("  ✓ 同步验证成功：hand数组和UI一致")
+	else:
+		print("  ⚠ 同步验证失败：hand数组 %d 张，UI显示 %d 张" % [player.hand.size(), ui_card_count])
+
+	print("=".repeat(60))
+	print("出牌成功，剩余手牌：%d张\n" % player.hand.size())
 	return true
 
 func validate_throw(player: Player, throw_pattern: GameRules.PlayPattern) -> bool:
