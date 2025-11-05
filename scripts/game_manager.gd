@@ -81,10 +81,15 @@ func initialize_game():
 	start_new_round()
 
 func start_new_round():
-	print("=== 开始新一局 ===")
+	print("\n" + "="*60)
+	print("=== 开始新一局 (第 %d 局) ===" % [total_rounds_played + 1])
+	print("="*60)
 	total_rounds_played += 1
 
-	# 重置游戏状态
+	# ==========================================
+	# 步骤1: 重置游戏状态
+	# ==========================================
+	print("\n[步骤1] 重置游戏状态")
 	team_scores = [0, 0]
 	current_bid = {
 		"team": -1,
@@ -95,21 +100,45 @@ func start_new_round():
 	bidding_round = 0
 	current_phase = GamePhase.DEALING_AND_BIDDING
 
-	# 步骤1: 洗牌
-	print("步骤1: 洗牌")
-	deck.shuffle()
+	# 清理所有玩家手牌
+	for player in players:
+		for card in player.hand:
+			if is_instance_valid(card):
+				card.queue_free()
+		player.hand.clear()
+		player.selected_cards.clear()
+		player.is_dealer = false
 
-	# 步骤2: 准备底牌（8张）
-	print("步骤2: 准备底牌（8张）")
+	# 重新创建牌堆
+	deck = Deck.new(num_decks)
+	deck.create_deck()
+	print("  - 创建牌堆: %d 副牌, 共 %d 张牌" % [num_decks, deck.cards.size()])
+
+	# ==========================================
+	# 步骤2: 洗牌
+	# ==========================================
+	print("\n[步骤2] 洗牌")
+	deck.shuffle()
+	print("  - 洗牌完成")
+
+	# ==========================================
+	# 步骤3: 准备底牌（8张）
+	# ==========================================
+	print("\n[步骤3] 准备底牌")
 	bottom_cards.clear()
 	for _i in 8:
 		if deck.cards.size() > 0:
 			bottom_cards.append(deck.cards.pop_back())
-	print("底牌准备完成，剩余牌数：", deck.cards.size())
+	print("  - 底牌准备完成: 8张")
+	print("  - 剩余待发牌数: %d张" % deck.cards.size())
 
+	# 标记庄家（上一局的庄家或初始庄家）
 	players[dealer_index].is_dealer = true
+	print("  - 当前庄家: %s (player_id=%d)" % [players[dealer_index].player_name, dealer_index])
 
+	# ==========================================
 	# 初始化UI
+	# ==========================================
 	if ui_manager:
 		ui_manager.update_level(current_level)
 		ui_manager.update_trump_suit("?")
@@ -124,8 +153,11 @@ func start_new_round():
 
 	phase_changed.emit(current_phase)
 
-	# 步骤3: 开始逐张发牌（发牌过程中可以随时叫牌）
-	print("步骤3: 开始发牌，发牌过程中可以随时叫牌")
+	# ==========================================
+	# 步骤4: 开始逐张发牌（发牌过程中可以随时叫牌）
+	# ==========================================
+	print("\n[步骤4] 开始发牌（发牌过程中可随时叫牌）")
+	print("  - 从庄家 %s 开始发牌" % players[dealer_index].player_name)
 	await get_tree().process_frame
 	start_dealing_cards()
 
@@ -247,18 +279,26 @@ func check_and_handle_bidding(player: Player, latest_card: Card):
 
 func finish_dealing():
 	"""发牌完成，进行最后一次叫牌机会，然后确定主牌"""
-	print("=== finish_dealing() 被调用 ===")
-	print("步骤4: 发牌结束，检查是否有最后叫牌机会")
+	print("\n" + "="*60)
+	print("=== 发牌完成 ===")
+	print("="*60)
 
 	if ui_manager:
 		ui_manager.update_turn_message("发牌完成，最后叫牌机会...")
 
-	# 步骤4: 发牌结束后的最后叫牌机会
+	# ==========================================
+	# 步骤5: 发牌结束后的最后叫牌机会
+	# ==========================================
+	print("\n[步骤5] 最后叫牌机会")
+	print("  - 当前叫牌状态: %s" % ("无人叫牌" if current_bid["count"] == 0 else "%s 叫了 %d 张" % [players[current_bid["player_id"]].player_name, current_bid["count"]]))
+
 	# 检查所有玩家是否有更多等级牌可以反叫
 	await check_final_bidding_opportunity()
 
-	# 步骤5: 确定主牌和庄家
-	print("步骤5: 确定主牌和庄家")
+	# ==========================================
+	# 步骤6: 确定主牌和庄家
+	# ==========================================
+	print("\n[步骤6] 确定主牌和庄家")
 	if ui_manager and ui_manager.has_node("BiddingUI"):
 		var bidding_ui = ui_manager.get_node("BiddingUI")
 		bidding_ui.hide_bidding_ui()
@@ -267,11 +307,15 @@ func finish_dealing():
 	if current_bid["count"] == 0:
 		trump_suit = Card.Suit.SPADE
 		current_bid["team"] = players[dealer_index].team
-		print("没人叫牌，默认庄家队叫黑桃")
+		print("  - 没人叫牌，默认庄家队叫黑桃")
+		print("  - 庄家: %s (保持不变)" % players[dealer_index].player_name)
 	else:
 		trump_suit = current_bid["suit"]
-		dealer_index = current_bid["player_id"]  # 叫到主的人成为庄家
-		print("叫牌成功！新庄家：", players[dealer_index].player_name, " (player_id=", dealer_index, ")")
+		dealer_index = current_bid["player_id"]  # 叫到主的人成为新庄家
+		print("  - 叫牌成功！")
+		print("  - 新庄家: %s (player_id=%d)" % [players[dealer_index].player_name, dealer_index])
+		print("  - 主牌花色: %s" % get_suit_name(trump_suit))
+		print("  - 庄家队伍: 队伍%d" % [current_bid["team"] + 1])
 
 	if ui_manager:
 		ui_manager.update_trump_suit(get_trump_symbol())
@@ -279,13 +323,17 @@ func finish_dealing():
 
 	await get_tree().create_timer(2.0).timeout
 
-	# 步骤6: 进入埋底阶段
-	print("步骤6: 进入埋底阶段")
+	# ==========================================
+	# 步骤7: 进入埋底阶段
+	# ==========================================
+	print("\n[步骤7] 进入埋底阶段")
+	print("  - 庄家 %s 将收到8张底牌" % players[dealer_index].player_name)
+
 	if players[dealer_index].player_type == Player.PlayerType.HUMAN:
-		print("庄家是人类玩家，进入人类埋底阶段")
+		print("  - 庄家是人类玩家，等待手动埋底")
 		start_burying_phase()
 	else:
-		print("庄家是AI玩家，进入AI埋底阶段")
+		print("  - 庄家是AI玩家，自动埋底")
 		ai_bury_bottom()
 
 # =====================================
@@ -556,17 +604,24 @@ func get_suit_name(suit: Card.Suit) -> String:
 
 func start_burying_phase():
 	"""开始埋底阶段"""
-	print("=== start_burying_phase() 被调用 ===")
-	print("当前阶段变更为：BURYING")
+	print("\n" + "="*60)
+	print("=== 埋底阶段 ===")
+	print("="*60)
 	current_phase = GamePhase.BURYING
 
 	var dealer = players[dealer_index]
-	print("庄家：", dealer.player_name, " 收到底牌，手牌数：", dealer.hand.size())
+	print("\n[埋底] 庄家收到底牌")
+	print("  - 庄家: %s" % dealer.player_name)
+	print("  - 当前手牌数: %d张" % dealer.hand.size())
+	print("  - 准备发放底牌: 8张")
 
+	# 庄家收到8张底牌
 	dealer.receive_cards(bottom_cards)
 	bottom_cards.clear()
 
-	print("底牌发放完成，庄家手牌数：", dealer.hand.size())
+	print("  - 底牌发放完成")
+	print("  - 庄家当前手牌总数: %d张" % dealer.hand.size())
+	print("  - 等待庄家选择8张牌扣底...")
 
 	if ui_manager:
 		ui_manager.update_turn_message("庄家埋底 - 请选择8张牌作为底牌")
@@ -576,23 +631,23 @@ func start_burying_phase():
 
 func _on_bury_cards_pressed():
 	"""玩家点击埋底按钮"""
-	print("=== _on_bury_cards_pressed() 被调用 ===")
-	print("当前阶段：", current_phase)
+	print("\n[埋底] 玩家确认埋底")
 
 	if current_phase != GamePhase.BURYING:
-		print("警告：当前不是埋底阶段，忽略埋底操作")
+		print("  ⚠ 警告：当前不是埋底阶段，忽略操作")
 		return
 
 	var dealer = players[dealer_index]
 
 	if dealer.selected_cards.size() != 8:
-		print("选中的牌数量不对：", dealer.selected_cards.size(), " 需要8张")
+		print("  ⚠ 选中牌数不对：%d张 (需要8张)" % dealer.selected_cards.size())
 		if ui_manager:
 			ui_manager.show_center_message("请选择正好8张牌!", 1.5)
 		return
 
-	print("埋底操作：从 ", dealer.hand.size(), " 张手牌中移除 8 张")
+	print("  - 从%d张手牌中选择了8张埋底" % dealer.hand.size())
 
+	# 将选中的8张牌移到底牌
 	for card in dealer.selected_cards:
 		bottom_cards.append(card)
 		dealer.hand.erase(card)
@@ -603,15 +658,16 @@ func _on_bury_cards_pressed():
 	dealer.selected_cards.clear()
 	dealer.update_hand_display()
 
-	print("埋底完成，庄家剩余手牌：", dealer.hand.size())
+	print("  - 埋底完成！")
+	print("  - 庄家剩余手牌: %d张" % dealer.hand.size())
+	print("  - 底牌总分: %d分" % GameRules.calculate_points(bottom_cards))
 
 	if ui_manager:
 		ui_manager.show_bury_button(false)
 		ui_manager.show_center_message("埋底完成", 1.5)
 
-	print("等待1.5秒后进入出牌阶段...")
+	print("\n等待1.5秒后进入出牌阶段...")
 	await get_tree().create_timer(1.5).timeout
-	print("调用 start_playing_phase()")
 	start_playing_phase()
 
 func auto_bury_for_player(dealer: Player):
@@ -655,11 +711,17 @@ func ai_bury_bottom():
 
 func start_playing_phase():
 	"""开始出牌阶段"""
-	print("=== start_playing_phase() 被调用 ===")
-	print("当前阶段变更为：PLAYING")
+	print("\n" + "="*60)
+	print("=== 出牌阶段 ===")
+	print("="*60)
 	current_phase = GamePhase.PLAYING
 
+	print("\n[出牌阶段] 初始化")
+	print("  - 主牌花色: %s" % get_suit_name(trump_suit))
+	print("  - 当前等级: %d" % current_level)
+
 	# 重新整理所有玩家的手牌（主牌放最后）
+	print("\n[出牌阶段] 整理手牌")
 	for player in players:
 		# 设置所有牌的主牌状态
 		for card in player.hand:
@@ -668,10 +730,19 @@ func start_playing_phase():
 		player.sort_hand(true, trump_suit, current_level)
 		# 更新显示
 		player.update_hand_display(true)
+		if player.player_type == Player.PlayerType.HUMAN:
+			print("  - %s: %d张手牌" % [player.player_name, player.hand.size()])
 
+	# 第一轮由庄家（叫牌成功的玩家）先出牌
 	current_player_index = dealer_index
-	print("庄家（叫牌成功的玩家）：", players[dealer_index].player_name, " (player_id=", dealer_index, ")")
-	print("首先出牌的玩家：", players[current_player_index].player_name)
+	print("\n[第1轮] 开始")
+	print("  - 庄家（首家）: %s (player_id=%d)" % [players[dealer_index].player_name, dealer_index])
+	print("  - 出牌顺序: %s → %s → %s → %s" % [
+		players[dealer_index].player_name,
+		players[(dealer_index + 1) % 4].player_name,
+		players[(dealer_index + 2) % 4].player_name,
+		players[(dealer_index + 3) % 4].player_name
+	])
 
 	if ui_manager:
 		ui_manager.update_turn_message("轮到 %s 出牌" % players[current_player_index].player_name)
@@ -680,11 +751,11 @@ func start_playing_phase():
 	phase_changed.emit(current_phase)
 
 	if players[current_player_index].player_type == Player.PlayerType.AI:
-		print("首位出牌的是AI，等待1秒后让AI出牌")
+		print("  - %s 是AI，自动出牌..." % players[current_player_index].player_name)
 		await get_tree().create_timer(1.0).timeout
 		ai_play_turn(players[current_player_index])
 	else:
-		print("首位出牌的是人类玩家，等待玩家操作")
+		print("  - %s 是人类玩家，等待操作..." % players[current_player_index].player_name)
 
 func get_trump_symbol() -> String:
 	match trump_suit:
@@ -899,13 +970,18 @@ func ai_play_turn(ai_player: Player):
 			next_player_turn()
 
 func evaluate_trick():
-	"""评估本轮"""
-	print("=== 评估本轮 ===")
-	print("当前回合出牌顺序：")
+	"""评估本轮出牌，判定赢家"""
+	print("\n" + "-"*60)
+	print("[本轮结算]")
+
+	# 显示本轮所有人的出牌
 	for i in range(current_trick.size()):
 		var play = current_trick[i]
-		print("  ", i+1, ". ", players[play["player_id"]].player_name, " 出了 ", play["cards"].size(), " 张牌")
+		var player = players[play["player_id"]]
+		var pattern_name = get_pattern_name(play["pattern"].pattern_type)
+		print("  %d. %s: %s (%d张)" % [i+1, player.player_name, pattern_name, play["cards"].size()])
 
+	# 比较所有出牌，找出赢家
 	var lead_play = current_trick[0]
 	var winner_play = lead_play
 
@@ -917,13 +993,17 @@ func evaluate_trick():
 			winner_play = current_play
 
 	var winner = players[winner_play["player_id"]]
-	print("本轮赢家：", winner.player_name, " (player_id=", winner_play["player_id"], ")")
 
+	# 计算本轮分数
 	var points = 0
 	for play in current_trick:
 		points += GameRules.calculate_points(play["cards"])
 
 	team_scores[winner.team] += points
+
+	print("  → 赢家: %s (队伍%d)" % [winner.player_name, winner.team + 1])
+	print("  → 本轮得分: %d分" % points)
+	print("  → 当前比分: 队伍1 %d分 | 队伍2 %d分" % [team_scores[0], team_scores[1]])
 
 	if ui_manager:
 		ui_manager.update_team_scores(team_scores[0], team_scores[1])
@@ -931,37 +1011,53 @@ func evaluate_trick():
 
 	await get_tree().create_timer(2.0).timeout
 
+	# 清理本轮出的牌
 	for play in current_trick:
 		for card in play["cards"]:
 			if is_instance_valid(card) and card.get_parent():
 				card.queue_free()
 
 	current_trick.clear()
-	
+
+	# 检查是否所有牌都出完了
 	if players[0].get_hand_size() == 0:
+		print("\n" + "="*60)
+		print("=== 所有牌已出完，结算底牌 ===")
+		print("="*60)
 		await get_tree().create_timer(1.0).timeout
-		
+
 		var bottom_points = GameRules.calculate_points(bottom_cards)
 		var multiplier = 2
 
+		print("\n[底牌结算]")
+		print("  - 底牌分数: %d分" % bottom_points)
+		print("  - 倍数: ×%d" % multiplier)
+		print("  - 最后一轮赢家: %s (队伍%d)" % [winner.player_name, winner.team + 1])
 
 		if winner.team == current_bid["team"]:
+			# 庄家队扣底
 			team_scores[current_bid["team"]] += bottom_points * multiplier
+			print("  - 庄家队扣底成功！获得 %d 分" % [bottom_points * multiplier])
 			if ui_manager:
 				ui_manager.show_center_message("庄家队扣底成功!+%d分" % [bottom_points * multiplier], 2.0)
 				ui_manager.update_team_scores(team_scores[0], team_scores[1])
 		else:
+			# 对手队抠底
 			var opponent_team = 1 - current_bid["team"]
 			team_scores[opponent_team] += bottom_points * multiplier
+			print("  - 对手队抠底成功！获得 %d 分" % [bottom_points * multiplier])
 			if ui_manager:
 				ui_manager.show_center_message("对手队抠底成功!+%d分" % [bottom_points * multiplier], 2.0)
 				ui_manager.update_team_scores(team_scores[0], team_scores[1])
-		
+
+		print("  - 最终比分: 队伍1 %d分 | 队伍2 %d分" % [team_scores[0], team_scores[1]])
+
 		await get_tree().create_timer(2.0).timeout
 		end_round()
 	else:
+		# 继续下一轮，赢家先出牌
 		current_player_index = winner_play["player_id"]
-		print("下一轮由赢家先出牌：", players[current_player_index].player_name, " (player_id=", current_player_index, ")")
+		print("\n[下一轮] 由赢家 %s 先出牌" % players[current_player_index].player_name)
 		await get_tree().create_timer(1.0).timeout
 
 		if ui_manager:
@@ -980,85 +1076,104 @@ func end_round():
 	"""本局结束，计算升级"""
 	current_phase = GamePhase.SCORING
 
-	print("=== 本局结束，开始计算升级 ===")
+	print("\n" + "="*60)
+	print("=== 本局结束，计算升级 ===")
+	print("="*60)
+
 	var dealer_team = current_bid["team"]  # 庄家队（叫牌成功的队）
 	var attacker_team = 1 - dealer_team    # 对手队（闲家）
 	var attacker_score = team_scores[attacker_team]  # 对手队得分
 
-	print("庄家队：队伍", dealer_team + 1, " 得分：", team_scores[dealer_team])
-	print("对手队：队伍", attacker_team + 1, " 得分：", attacker_score)
+	print("\n[最终得分]")
+	print("  - 庄家队 (队伍%d): %d分" % [dealer_team + 1, team_scores[dealer_team]])
+	print("  - 对手队 (队伍%d): %d分" % [attacker_team + 1, attacker_score])
 
 	var levels_to_advance = 0
 	var winning_team = -1
+	var dealer_changed = false
+
+	print("\n[升级规则判定]")
+	print("  - 根据对手队得分: %d分" % attacker_score)
 
 	# 标准升级规则（根据对手队得分）：
 	# 对手得分 < 40分：庄家升3级
-	# 对手得分 40-75分：庄家升2级
-	# 对手得分 80-115分：庄家升1级
-	# 对手得分 120-155分：对手升1级，庄家换到对手队
-	# 对手得分 160-195分：对手升2级，庄家换到对手队
+	# 对手得分 40-79分：庄家升2级
+	# 对手得分 80-119分：庄家升1级
+	# 对手得分 120-159分：对手升1级，庄家换到对手队
+	# 对手得分 160-199分：对手升2级，庄家换到对手队
 	# 对手得分 ≥ 200分：对手升3级，庄家换到对手队
 
 	if attacker_score >= 200:
-		# 对手升3级
 		levels_to_advance = 3
 		winning_team = attacker_team
 		team_levels[attacker_team] += levels_to_advance
-		dealer_index = (dealer_index + 1) % 4  # 庄家换到对手队
+		dealer_index = (dealer_index + 1) % 4
+		dealer_changed = true
+		print("  - 对手得分≥200: 对手大胜！升3级，庄家轮换")
 		if ui_manager:
 			ui_manager.show_center_message("队伍%d 大胜！升%d级！" % [attacker_team + 1, levels_to_advance], 3.0)
 	elif attacker_score >= 160:
-		# 对手升2级
 		levels_to_advance = 2
 		winning_team = attacker_team
 		team_levels[attacker_team] += levels_to_advance
 		dealer_index = (dealer_index + 1) % 4
+		dealer_changed = true
+		print("  - 对手得分160-199: 对手获胜！升2级，庄家轮换")
 		if ui_manager:
 			ui_manager.show_center_message("队伍%d 获胜！升%d级！" % [attacker_team + 1, levels_to_advance], 3.0)
 	elif attacker_score >= 120:
-		# 对手升1级
 		levels_to_advance = 1
 		winning_team = attacker_team
 		team_levels[attacker_team] += levels_to_advance
 		dealer_index = (dealer_index + 1) % 4
+		dealer_changed = true
+		print("  - 对手得分120-159: 对手获胜！升1级，庄家轮换")
 		if ui_manager:
 			ui_manager.show_center_message("队伍%d 获胜！升%d级！" % [attacker_team + 1, levels_to_advance], 3.0)
 	elif attacker_score >= 80:
-		# 庄家守住，升1级
 		levels_to_advance = 1
 		winning_team = dealer_team
 		team_levels[dealer_team] += levels_to_advance
-		# 庄家不变
+		print("  - 对手得分80-119: 庄家守住！升1级，庄家不变")
 		if ui_manager:
 			ui_manager.show_center_message("队伍%d 守住！升%d级！" % [dealer_team + 1, levels_to_advance], 3.0)
 	elif attacker_score >= 40:
-		# 庄家守住，升2级
 		levels_to_advance = 2
 		winning_team = dealer_team
 		team_levels[dealer_team] += levels_to_advance
+		print("  - 对手得分40-79: 庄家守住！升2级，庄家不变")
 		if ui_manager:
 			ui_manager.show_center_message("队伍%d 守住！升%d级！" % [dealer_team + 1, levels_to_advance], 3.0)
 	else:
-		# 对手得分 < 40，庄家大胜，升3级
 		levels_to_advance = 3
 		winning_team = dealer_team
 		team_levels[dealer_team] += levels_to_advance
+		print("  - 对手得分<40: 庄家大胜！升3级，庄家不变")
 		if ui_manager:
 			ui_manager.show_center_message("队伍%d 大胜！升%d级！" % [dealer_team + 1, levels_to_advance], 3.0)
 
-	print("获胜队伍：队伍", winning_team + 1, " 升级：", levels_to_advance)
-	print("当前等级 - 队伍1：", team_levels[0], " 队伍2：", team_levels[1])
+	print("\n[升级结果]")
+	print("  - 获胜队伍: 队伍%d" % [winning_team + 1])
+	print("  - 升级数: %d级" % levels_to_advance)
+	print("  - 队伍1当前等级: %d" % team_levels[0])
+	print("  - 队伍2当前等级: %d" % team_levels[1])
+	if dealer_changed:
+		print("  - 庄家轮换到: %s (player_id=%d)" % [players[dealer_index].player_name, dealer_index])
+	else:
+		print("  - 庄家保持: %s (player_id=%d)" % [players[dealer_index].player_name, dealer_index])
 
 	# 更新当前级别（取两队中最高的）
 	current_level = max(team_levels[0], team_levels[1])
-	
+	print("  - 下一局等级: %d" % current_level)
+
 	await get_tree().create_timer(3.0).timeout
-	
+
 	# 检查游戏是否结束
 	if check_game_over():
+		print("\n游戏结束！有队伍达到A（14级）")
 		show_game_over_screen()
 	else:
-		# 继续下一局
+		print("\n准备开始下一局...")
 		start_new_round()
 
 func check_game_over() -> bool:
