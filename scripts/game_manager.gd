@@ -808,6 +808,17 @@ func _on_play_cards_pressed():
 		return
 
 	var human_player = players[0]
+
+	print("\n[出牌按钮] 按钮被点击 - 立即检查状态")
+	print("  - selected_cards数组大小: %d" % human_player.selected_cards.size())
+	if human_player.selected_cards.size() > 0:
+		print("  - selected_cards详细内容:")
+		for i in range(human_player.selected_cards.size()):
+			var c = human_player.selected_cards[i]
+			print("    [%d] 对象ID=%s %s (suit=%d, rank=%d) is_selected=%s in_hand=%s" % [
+				i, c.get_instance_id(), c.get_card_name(), c.suit, c.rank, c.is_selected, human_player.hand.has(c)
+			])
+
 	if human_player.selected_cards.is_empty():
 		if ui_manager:
 			ui_manager.show_center_message("请先选择要出的牌!", 1.5)

@@ -359,6 +359,14 @@ func _on_card_clicked(card: Card):
 	selection_changed.emit(selected_cards.size())
 	card_selected.emit(card)
 
+	# 验证：确认卡牌对象在数组中
+	print("[验证] 验证selected_cards数组完整性:")
+	for i in range(selected_cards.size()):
+		var c = selected_cards[i]
+		print("  [%d] 对象ID=%s %s (suit=%d, rank=%d) is_selected=%s" % [
+			i, c.get_instance_id(), c.get_card_name(), c.suit, c.rank, c.is_selected
+		])
+
 func play_selected_cards() -> bool:
 	if selected_cards.is_empty():
 		return false
