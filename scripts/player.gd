@@ -139,9 +139,16 @@ func _get_trump_type(card: Card, trump_suit: Card.Suit, current_rank: int) -> in
 
 func update_hand_display(animate: bool = true):
 	"""更新手牌显示，确保与hand数组完全同步"""
-	print("=== update_hand_display 开始 ===")
+	print("\n=== update_hand_display 开始 ===")
+	print("调用栈：", get_stack())
 	print("hand数组大小：", hand.size())
 	print("hand_container子节点数：", hand_container.get_child_count())
+	print("selected_cards大小（调用前）：", selected_cards.size())
+	if selected_cards.size() > 0:
+		print("selected_cards内容：")
+		for i in range(selected_cards.size()):
+			var c = selected_cards[i]
+			print("  [%d] %s (对象ID=%s, is_selected=%s)" % [i, c.get_card_name(), c.get_instance_id(), c.is_selected])
 
 	# 输出hand数组中的所有卡牌
 	if hand.size() <= 5:  # 只在手牌少时详细输出
@@ -174,6 +181,24 @@ func update_hand_display(animate: bool = true):
 		# 确保卡牌可见和可选择（只对在手牌中的卡牌）
 		card.visible = true
 		card.is_selectable = true
+
+		# 检查一致性：selected_cards数组和card.is_selected属性
+		var in_selected_array = selected_cards.has(card)
+		var has_selected_flag = card.is_selected
+		if in_selected_array != has_selected_flag:
+			print("  ⚠ 不一致！卡牌 %s: in_array=%s, flag=%s" % [card.get_card_name(), in_selected_array, has_selected_flag])
+			# 修复：以selected_cards数组为准
+			if in_selected_array and not has_selected_flag:
+				print("    → 修复：设置is_selected=true")
+				card.is_selected = true
+				if card.sprite:
+					card.sprite.modulate = Color(1.3, 1.3, 1.0)
+			elif not in_selected_array and has_selected_flag:
+				print("    → 修复：设置is_selected=false，从selected_cards移除")
+				card.is_selected = false
+				if card.sprite:
+					card.sprite.modulate = Color.WHITE
+				selected_cards.erase(card)
 
 		# 确保卡牌颜色正常（清除任何残留的高亮）
 		if card.sprite and not card.is_selected:
@@ -209,7 +234,10 @@ func update_hand_display(animate: bool = true):
 			else:
 				card.position = target_pos
 
-		card.z_index = i
+		# 只对未选中的卡牌设置普通z_index，选中的卡牌保持高z_index
+		if not was_selected:
+			card.z_index = i
+		# 如果卡牌被选中，保持其高z_index（在_on_card_clicked中设置的1000+）
 
 	# 输出更新后的位置信息（只在手牌少时）
 	if hand.size() <= 5:
@@ -222,15 +250,30 @@ func update_hand_display(animate: bool = true):
 				card.visible, card.is_selectable
 			])
 
-	print("=== update_hand_display 完成 ===") 
+	print("selected_cards大小（调用后）：", selected_cards.size())
+	if selected_cards.size() > 0:
+		print("selected_cards内容（调用后）：")
+		for i in range(selected_cards.size()):
+			var c = selected_cards[i]
+			print("  [%d] %s (对象ID=%s, is_selected=%s, in_hand=%s)" % [i, c.get_card_name(), c.get_instance_id(), c.is_selected, hand.has(c)])
+	print("=== update_hand_display 完成 ===\n")
 
 func _on_card_clicked(card: Card):
 	if player_type != PlayerType.HUMAN:
 		return
 
-	print("\n[卡牌点击] 玩家点击了卡牌")
+	print("\n" + "=".repeat(60))
+	print("[卡牌点击] 玩家点击了卡牌")
+	print("=".repeat(60))
 	print("  - 卡牌信息: %s (suit=%d, rank=%d, 对象ID=%s)" % [card.get_card_name(), card.suit, card.rank, card.get_instance_id()])
 	print("  - 当前是否选中: %s" % ("是" if card.is_selected else "否"))
+	print("  - 点击前selected_cards状态:")
+	print("    - 数组大小: %d" % selected_cards.size())
+	if selected_cards.size() > 0:
+		print("    - 数组内容:")
+		for i in range(selected_cards.size()):
+			var c = selected_cards[i]
+			print("      [%d] %s (对象ID=%s, is_selected=%s)" % [i, c.get_card_name(), c.get_instance_id(), c.is_selected])
 
 	# 检查卡牌是否在手牌中（防止已出的牌被点击）
 	if not hand.has(card):
@@ -255,11 +298,15 @@ func _on_card_clicked(card: Card):
 		# 将选中的卡牌置于最前面
 		card.z_index = 1000 + selected_cards.size()
 
-	print("  - 当前已选中卡牌数量: %d" % selected_cards.size())
-	print("  - 已选中的卡牌:")
-	for i in range(selected_cards.size()):
-		var c = selected_cards[i]
-		print("    [%d] %s (suit=%d, rank=%d, 对象ID=%s)" % [i, c.get_card_name(), c.suit, c.rank, c.get_instance_id()])
+	print("  - 点击后selected_cards状态:")
+	print("    - 数组大小: %d" % selected_cards.size())
+	if selected_cards.size() > 0:
+		print("    - 数组内容:")
+		for i in range(selected_cards.size()):
+			var c = selected_cards[i]
+			print("      [%d] %s (suit=%d, rank=%d, 对象ID=%s, is_selected=%s)" % [i, c.get_card_name(), c.suit, c.rank, c.get_instance_id(), c.is_selected])
+
+	print("=".repeat(60) + "\n")
 
 	# 发出选牌变化信号
 	selection_changed.emit(selected_cards.size())
