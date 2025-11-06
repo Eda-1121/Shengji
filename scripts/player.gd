@@ -1,4 +1,12 @@
-# player.gd - 玩家类(改进版)
+# player.gd - 玩家类（唯一卡牌对象架构）
+#
+# 架构核心原则：
+# 1. hand: Array[Card] 是唯一数据源（Single Source of Truth）
+# 2. 每张 Card 对象从 Deck 创建后，在整个游戏流程中保持同一对象实例
+# 3. 所有数组操作（append, erase, pop等）都是引用传递，不复制对象
+# 4. Card.is_selected 属性直接存储选择状态，不使用独立数组
+# 5. UI 层 (hand_container) 纯粹用于显示，从 hand 数组同步
+#
 extends Node2D
 class_name Player
 
@@ -14,7 +22,7 @@ var player_type: PlayerType = PlayerType.HUMAN
 var team: int = 0
 var current_rank: int = 2
 
-var hand: Array[Card] = []  # 唯一数据源 (Single Source of Truth)
+var hand: Array[Card] = []  # 唯一数据源：存储 Card 对象引用（不是副本）
 var is_dealer: bool = false
 
 # UI相关
@@ -77,12 +85,18 @@ func clear_selection():
 # =====================================
 
 func receive_cards(cards: Array[Card]):
+	"""接收卡牌（唯一对象架构：确保接收的是原始对象引用）"""
 	for card in cards:
 		# 验证：记录收到的卡牌对象ID
 		if player_type == PlayerType.HUMAN and hand.size() < 3:  # 只在前3张时打印
 			print("[receive_cards] %s 收到卡牌: %s 对象ID=%s" % [player_name, card.get_card_name(), card.get_instance_id()])
 
-		hand.append(card)
+		# 验证卡牌对象唯一性（检查是否重复添加）
+		if hand.has(card):
+			print("⚠ 警告：尝试添加已存在的卡牌！%s (对象ID=%s)" % [card.get_card_name(), card.get_instance_id()])
+			continue
+
+		hand.append(card)  # 存储对象引用（不复制）
 
 		if card.get_parent():
 			card.get_parent().remove_child(card)
