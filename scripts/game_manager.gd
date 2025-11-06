@@ -111,7 +111,7 @@ func start_new_round():
 			if is_instance_valid(card):
 				card.queue_free()
 		player.hand.clear()
-		player.selected_cards.clear()
+		player.clear_selection()  # 新架构：使用方法清除选择
 		player.is_dealer = false
 
 	# 重新创建牌堆
@@ -665,8 +665,9 @@ func _on_bury_cards_pressed():
 
 	var dealer = players[dealer_index]
 
-	if dealer.selected_cards.size() != 8:
-		print("  ⚠ 选中牌数不对：%d张 (需要8张)" % dealer.selected_cards.size())
+	var selected = dealer.get_selected_cards()  # 新架构：使用计算属性
+	if selected.size() != 8:
+		print("  ⚠ 选中牌数不对：%d张 (需要8张)" % selected.size())
 		if ui_manager:
 			ui_manager.show_center_message("请选择正好8张牌!", 1.5)
 		return
@@ -674,14 +675,14 @@ func _on_bury_cards_pressed():
 	print("  - 从%d张手牌中选择了8张埋底" % dealer.hand.size())
 
 	# 将选中的8张牌移到底牌
-	for card in dealer.selected_cards:
+	for card in selected:
 		bottom_cards.append(card)
 		dealer.hand.erase(card)
 		if card.get_parent() == dealer.hand_container:
 			dealer.hand_container.remove_child(card)
 		card.set_selected(false)
 
-	dealer.selected_cards.clear()
+	dealer.clear_selection()  # 新架构：使用方法清除选择
 	dealer.update_hand_display()
 
 	print("  - 埋底完成！")
@@ -810,30 +811,31 @@ func _on_play_cards_pressed():
 	var human_player = players[0]
 
 	print("\n[出牌按钮] 按钮被点击 - 立即检查状态")
-	print("  - selected_cards数组大小: %d" % human_player.selected_cards.size())
-	if human_player.selected_cards.size() > 0:
-		print("  - selected_cards详细内容:")
-		for i in range(human_player.selected_cards.size()):
-			var c = human_player.selected_cards[i]
-			print("    [%d] 对象ID=%s %s (suit=%d, rank=%d) is_selected=%s in_hand=%s" % [
-				i, c.get_instance_id(), c.get_card_name(), c.suit, c.rank, c.is_selected, human_player.hand.has(c)
+	var selected = human_player.get_selected_cards()  # 新架构：使用计算属性
+	print("  - 选中卡牌数: %d" % selected.size())
+	if selected.size() > 0:
+		print("  - 选中卡牌详细内容:")
+		for i in range(selected.size()):
+			var c = selected[i]
+			print("    [%d] 对象ID=%s %s (suit=%d, rank=%d)" % [
+				i, c.get_instance_id(), c.get_card_name(), c.suit, c.rank
 			])
 
-	if human_player.selected_cards.is_empty():
+	if selected.is_empty():
 		if ui_manager:
 			ui_manager.show_center_message("请先选择要出的牌!", 1.5)
 		return
 
 	print("\n[出牌按钮] 玩家点击出牌按钮")
-	print("  - 已选中卡牌数量: %d" % human_player.selected_cards.size())
+	print("  - 已选中卡牌数量: %d" % selected.size())
 	print("  - 已选中的卡牌列表:")
-	for i in range(human_player.selected_cards.size()):
-		var c = human_player.selected_cards[i]
+	for i in range(selected.size()):
+		var c = selected[i]
 		print("    [%d] %s (suit=%d, rank=%d, 对象ID=%s)" % [i, c.get_card_name(), c.suit, c.rank, c.get_instance_id()])
 
 	# 先复制一份要出的牌，避免后续操作影响
 	var cards_to_play: Array[Card] = []
-	for card in human_player.selected_cards:
+	for card in selected:
 		card.set_trump(trump_suit, current_level)
 		cards_to_play.append(card)
 
@@ -859,9 +861,7 @@ func _on_play_cards_pressed():
 					ui_manager.show_center_message("甩牌失败! 其他人能管上", 2.0)
 
 				# 甩牌失败，清理所有选中牌的选择状态
-				for card in human_player.selected_cards:
-					card.set_selected(false)
-				human_player.selected_cards.clear()
+				human_player.clear_selection()  # 新架构：使用方法清除选择
 
 				# 只出最大的牌
 				var largest_card = GameRules.get_largest_card(pattern.cards, trump_suit, current_level)
@@ -932,7 +932,7 @@ func execute_play_cards(player: Player, cards_to_play: Array[Card]) -> bool:
 	print("\n[步骤1] 出牌前状态")
 	print("  - hand数组大小: %d" % player.hand.size())
 	print("  - hand_container子节点数: %d" % player.hand_container.get_child_count())
-	print("  - selected_cards大小: %d" % player.selected_cards.size())
+	print("  - 选中卡牌数: %d" % player.get_selected_count())
 
 	# 验证所有要出的牌都在hand中
 	for card in cards_to_play:
@@ -950,29 +950,22 @@ func execute_play_cards(player: Player, cards_to_play: Array[Card]) -> bool:
 				card.sprite.modulate = Color.WHITE
 			print("  - 清除选中状态: %s" % card.get_card_name())
 
-		# 从手牌数组移除
+		# 从手牌数组移除（唯一数据源）
 		player.hand.erase(card)
 
-		# 从UI容器移除（关键！必须在这里移除）
+		# 从UI容器移除
 		if card.get_parent() == player.hand_container:
 			player.hand_container.remove_child(card)
 			print("  - 从hand_container移除: %s" % card.get_card_name())
-
-		# 从选中列表移除
-		if player.selected_cards.has(card):
-			player.selected_cards.erase(card)
 
 		# 断开信号
 		if card.card_clicked.is_connected(player._on_card_clicked):
 			card.card_clicked.disconnect(player._on_card_clicked)
 
-	# 清空选中列表
-	player.selected_cards.clear()
-
 	print("\n[步骤3] 移除后状态")
 	print("  - hand数组大小: %d" % player.hand.size())
 	print("  - hand_container子节点数: %d" % player.hand_container.get_child_count())
-	print("  - selected_cards大小: %d" % player.selected_cards.size())
+	print("  - 选中卡牌数: %d" % player.get_selected_count())
 
 	print("\n[步骤4] 显示出的牌到出牌区域")
 	show_played_cards(player.player_id, cards_to_play)
@@ -1421,7 +1414,7 @@ func restart_game():
 			if is_instance_valid(card):
 				card.queue_free()
 		player.hand.clear()
-		player.selected_cards.clear()
+		player.clear_selection()  # 新架构：使用方法清除选择
 	
 	# 隐藏游戏结束界面
 	if ui_manager and ui_manager.has_node("GameOverUI"):

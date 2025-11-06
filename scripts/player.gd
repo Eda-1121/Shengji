@@ -14,13 +14,13 @@ var player_type: PlayerType = PlayerType.HUMAN
 var team: int = 0
 var current_rank: int = 2
 
-var hand: Array[Card] = []
+var hand: Array[Card] = []  # 唯一数据源 (Single Source of Truth)
 var is_dealer: bool = false
 
 # UI相关
 var hand_container: Node2D
 var card_spacing: float = 35.0  # 卡牌间距（恢复原始值）
-var selected_cards: Array[Card] = []
+# 移除 selected_cards 数组 - 改用计算属性，从 hand 数组中筛选 is_selected=true 的卡牌
 
 func _ready():
 	hand_container = Node2D.new()
@@ -44,6 +44,36 @@ func center_hand_container():
 		print("  - 屏幕中心X: %d" % screen_center_x)
 		print("  - 玩家位置X: %d" % position.x)
 		print("  - hand_container偏移X: %d" % hand_container.position.x)
+
+# =====================================
+# 卡牌选择管理（新架构：单一数据源）
+# =====================================
+
+func get_selected_cards() -> Array[Card]:
+	"""获取所有选中的卡牌（计算属性，从 hand 数组筛选）"""
+	var selected: Array[Card] = []
+	for card in hand:
+		if card.is_selected:
+			selected.append(card)
+	return selected
+
+func get_selected_count() -> int:
+	"""获取选中卡牌的数量"""
+	var count = 0
+	for card in hand:
+		if card.is_selected:
+			count += 1
+	return count
+
+func clear_selection():
+	"""清除所有卡牌的选中状态"""
+	for card in hand:
+		if card.is_selected:
+			card.set_selected(false)
+
+# =====================================
+# 卡牌管理
+# =====================================
 
 func receive_cards(cards: Array[Card]):
 	for card in cards:
@@ -146,229 +176,113 @@ func _get_trump_type(card: Card, trump_suit: Card.Suit, current_rank: int) -> in
 	return 5
 
 func update_hand_display(animate: bool = true):
-	"""更新手牌显示，确保与hand数组完全同步"""
+	"""更新手牌显示（新架构：纯UI布局，不管理状态）"""
 	print("\n=== update_hand_display 开始 ===")
-	print("调用栈：", get_stack())
 	print("hand数组大小：", hand.size())
-	print("hand_container子节点数：", hand_container.get_child_count())
-	print("selected_cards大小（调用前）：", selected_cards.size())
-	if selected_cards.size() > 0:
-		print("selected_cards内容：")
-		for i in range(selected_cards.size()):
-			var c = selected_cards[i]
-			print("  [%d] %s (对象ID=%s, is_selected=%s)" % [i, c.get_card_name(), c.get_instance_id(), c.is_selected])
+	print("选中卡牌数：", get_selected_count())
 
-	# 输出hand数组中的所有卡牌
-	if hand.size() <= 5:  # 只在手牌少时详细输出
-		print("hand数组内容：")
-		for i in range(hand.size()):
-			print("  [%d] %s" % [i, hand[i].get_card_name()])
-
-	# 第一步：彻底清理hand_container中所有不在hand数组中的卡牌
+	# 步骤1：同步 hand_container 与 hand 数组
+	# 移除不在 hand 中的卡牌
 	var to_remove = []
 	for child in hand_container.get_children():
-		if child is Card:
-			if not hand.has(child):
-				to_remove.append(child)
+		if child is Card and not hand.has(child):
+			to_remove.append(child)
 
 	for card in to_remove:
-		print("移除不在hand数组中的卡牌：", card.get_card_name())
 		hand_container.remove_child(card)
-		card.visible = false  # 隐藏已出的牌
-		card.is_selectable = false  # 确保不可选择
+		card.visible = false
+		card.is_selectable = false
 
-	# 第二步：确保hand数组中的所有卡牌都在hand_container中
+	# 添加 hand 中但不在 container 中的卡牌
 	for card in hand:
 		if card.get_parent() != hand_container:
-			print("将卡牌添加到hand_container：", card.get_card_name())
-			# 如果卡牌在其他父节点，先移除
 			if card.get_parent():
 				card.get_parent().remove_child(card)
 			hand_container.add_child(card)
 
-		# 确保卡牌可见和可选择（只对在手牌中的卡牌）
+		# 确保卡牌可见和可选择
 		card.visible = true
 		card.is_selectable = true
 
-		# 检查一致性：selected_cards数组和card.is_selected属性
-		var in_selected_array = selected_cards.has(card)
-		var has_selected_flag = card.is_selected
-		if in_selected_array != has_selected_flag:
-			print("  ⚠ 不一致！卡牌 %s (对象ID=%s): in_array=%s, flag=%s" % [
-				card.get_card_name(), card.get_instance_id(), in_selected_array, has_selected_flag
-			])
-			print("    → 不自动修复，保留当前状态")
-			# 移除自动修复逻辑，避免破坏用户选择
-
-		# 确保卡牌颜色正常（清除任何残留的高亮）
+		# 确保未选中的卡牌颜色正常
 		if card.sprite and not card.is_selected:
 			card.sprite.modulate = Color.WHITE
 
-	print("清理后 - hand_container子节点数：", hand_container.get_child_count())
-
-	# 验证：检查hand数组和hand_container的一致性
-	print("\n[一致性验证]")
-	print("  - hand数组中的卡牌是否都在hand_container中？")
-	for i in range(min(3, hand.size())):  # 只检查前3张
-		var card = hand[i]
-		var in_container = (card.get_parent() == hand_container)
-		print("    [%d] %s (对象ID=%s) parent=%s in_container=%s" % [
-			i, card.get_card_name(), card.get_instance_id(),
-			card.get_parent().name if card.get_parent() else "无",
-			in_container
-		])
-
-	print("  - hand_container中的卡牌是否都在hand数组中？")
-	var container_child_count = 0
-	for child in hand_container.get_children():
-		if child is Card:
-			if container_child_count < 3:  # 只打印前3个
-				var in_hand = hand.has(child)
-				print("    [%d] %s (对象ID=%s) in_hand=%s" % [
-					container_child_count, child.get_card_name(), child.get_instance_id(), in_hand
-				])
-			container_child_count += 1
-
-	# 第三步：重新排列所有手牌位置（居中对齐）
-	# 计算居中偏移量
+	# 步骤2：重新排列卡牌位置（居中对齐）
 	var total_width = 0
 	if hand.size() > 1:
 		total_width = (hand.size() - 1) * card_spacing
-	var start_offset = -total_width / 2.0  # 居中对齐的起始偏移量
+	var start_offset = -total_width / 2.0
 
 	for i in range(hand.size()):
 		var card = hand[i]
 		var target_pos = Vector2(start_offset + i * card_spacing, 0)
-
-		# 保存选中状态
-		var was_selected = card.is_selected
+		var is_selected = card.is_selected
 
 		if animate:
-			# 如果卡牌被选中，移动到偏移后的位置
-			if was_selected:
-				var offset_pos = Vector2(target_pos.x, target_pos.y - 30)  # SELECTED_HEIGHT = 30
+			if is_selected:
+				var offset_pos = Vector2(target_pos.x, target_pos.y - 30)
 				card.move_to_with_base(target_pos, offset_pos, 0.3)
 			else:
 				card.move_to(target_pos, 0.3)
 		else:
 			card.original_position = target_pos
-			if was_selected:
+			if is_selected:
 				card.position = Vector2(target_pos.x, target_pos.y - 30)
 			else:
 				card.position = target_pos
 
-		# 只对未选中的卡牌设置普通z_index，选中的卡牌保持高z_index
-		if not was_selected:
+		# z_index 管理
+		if not is_selected:
 			card.z_index = i
-		# 如果卡牌被选中，保持其高z_index（在_on_card_clicked中设置的1000+）
 
-	# 输出更新后的位置信息（只在手牌少时）
-	if hand.size() <= 5:
-		print("更新后的卡牌位置：")
-		for i in range(hand.size()):
-			var card = hand[i]
-			print("  [%d] %s at pos(%d, %d) visible=%s selectable=%s" % [
-				i, card.get_card_name(),
-				int(card.position.x), int(card.position.y),
-				card.visible, card.is_selectable
-			])
-
-	print("selected_cards大小（调用后）：", selected_cards.size())
-	if selected_cards.size() > 0:
-		print("selected_cards内容（调用后）：")
-		for i in range(selected_cards.size()):
-			var c = selected_cards[i]
-			print("  [%d] %s (对象ID=%s, is_selected=%s, in_hand=%s)" % [i, c.get_card_name(), c.get_instance_id(), c.is_selected, hand.has(c)])
 	print("=== update_hand_display 完成 ===\n")
 
 func _on_card_clicked(card: Card):
+	"""卡牌点击处理（新架构：只修改 card.is_selected 状态）"""
 	if player_type != PlayerType.HUMAN:
 		return
 
-	print("\n" + "=".repeat(60))
-	print("[卡牌点击] 玩家点击了卡牌")
-	print("=".repeat(60))
-	print("  - 卡牌信息: %s (suit=%d, rank=%d, 对象ID=%s)" % [card.get_card_name(), card.suit, card.rank, card.get_instance_id()])
-	print("  - 当前是否选中: %s" % ("是" if card.is_selected else "否"))
-	print("  - 点击前selected_cards状态:")
-	print("    - 数组大小: %d" % selected_cards.size())
-	if selected_cards.size() > 0:
-		print("    - 数组内容:")
-		for i in range(selected_cards.size()):
-			var c = selected_cards[i]
-			print("      [%d] %s (对象ID=%s, is_selected=%s)" % [i, c.get_card_name(), c.get_instance_id(), c.is_selected])
-
-	# 检查卡牌是否在手牌中（防止已出的牌被点击）
+	# 检查卡牌是否在手牌中
 	if not hand.has(card):
-		print("  ⚠ 警告：尝试选择不在手牌中的卡牌！")
-		print("  - 点击的卡牌: %s (对象ID=%s)" % [card.get_card_name(), card.get_instance_id()])
-		print("  - 手牌数组大小: %d" % hand.size())
-		print("  - 手牌中的所有卡牌:")
-		for i in range(hand.size()):
-			var h_card = hand[i]
-			var same_name = (h_card.get_card_name() == card.get_card_name())
-			var same_id = (h_card.get_instance_id() == card.get_instance_id())
-			print("    [%d] %s (对象ID=%s) 名字相同=%s 对象ID相同=%s" % [
-				i, h_card.get_card_name(), h_card.get_instance_id(), same_name, same_id
-			])
-		print("  - 检查hand_container中的卡牌:")
-		var container_index = 0
-		for child in hand_container.get_children():
-			if child is Card:
-				var is_clicked_card = (child.get_instance_id() == card.get_instance_id())
-				print("    [%d] %s (对象ID=%s) 是点击的卡牌=%s" % [
-					container_index, child.get_card_name(), child.get_instance_id(), is_clicked_card
-				])
-				container_index += 1
+		print("⚠ 警告：点击的卡牌不在手牌中")
 		return
 
+	print("\n[卡牌点击] %s (对象ID=%s)" % [card.get_card_name(), card.get_instance_id()])
+	print("  - 点击前状态: %s" % ("已选中" if card.is_selected else "未选中"))
+	print("  - 当前选中数: %d" % get_selected_count())
+
+	# 切换选中状态
 	if card.is_selected:
-		print("  - 操作：取消选中")
+		print("  - 操作: 取消选中")
 		card.set_selected(false)
-		selected_cards.erase(card)
 		# 恢复原始z_index
 		var index = hand.find(card)
 		if index >= 0:
 			card.z_index = index
 	else:
-		print("  - 操作：选中")
+		print("  - 操作: 选中")
 		card.set_selected(true)
-		selected_cards.append(card)
-		# 将选中的卡牌置于最前面
-		card.z_index = 1000 + selected_cards.size()
+		# 提高z_index，确保选中的卡牌在最上层
+		card.z_index = 1000 + get_selected_count()
 
-	print("  - 点击后selected_cards状态:")
-	print("    - 数组大小: %d" % selected_cards.size())
-	if selected_cards.size() > 0:
-		print("    - 数组内容:")
-		for i in range(selected_cards.size()):
-			var c = selected_cards[i]
-			print("      [%d] %s (suit=%d, rank=%d, 对象ID=%s, is_selected=%s)" % [i, c.get_card_name(), c.suit, c.rank, c.get_instance_id(), c.is_selected])
+	print("  - 点击后状态: %s" % ("已选中" if card.is_selected else "未选中"))
+	print("  - 当前选中数: %d" % get_selected_count())
 
-	print("=".repeat(60) + "\n")
-
-	# 发出选牌变化信号
-	selection_changed.emit(selected_cards.size())
+	# 发出信号
+	selection_changed.emit(get_selected_count())
 	card_selected.emit(card)
 
-	# 验证：确认卡牌对象在数组中
-	print("[验证] 验证selected_cards数组完整性:")
-	for i in range(selected_cards.size()):
-		var c = selected_cards[i]
-		print("  [%d] 对象ID=%s %s (suit=%d, rank=%d) is_selected=%s" % [
-			i, c.get_instance_id(), c.get_card_name(), c.suit, c.rank, c.is_selected
-		])
-
 func play_selected_cards() -> bool:
-	if selected_cards.is_empty():
+	"""出选中的牌（新架构：从 hand 中筛选）"""
+	var cards_to_play = get_selected_cards()
+	if cards_to_play.is_empty():
 		return false
 
-	# 复制一份，避免在play_cards中清空selected_cards影响cards参数
-	var cards_to_play = selected_cards.duplicate()
 	return play_cards(cards_to_play)
 
 func play_cards(cards: Array[Card]) -> bool:
-	"""出牌并更新手牌显示"""
+	"""出牌并更新手牌显示（新架构）"""
 	if not can_play_cards(cards):
 		print("错误：无法出牌，部分卡牌不在手牌中")
 		return false
@@ -377,45 +291,35 @@ func play_cards(cards: Array[Card]) -> bool:
 	print("出牌前 - hand.size() = ", hand.size())
 	print("准备出牌数量：", cards.size())
 
-	# 记录要出的牌
 	for card in cards:
 		print("出牌：", card.get_card_name())
 
-	for card in cards:
-		# 立即取消选中状态（不使用动画，避免Tween冲突）
+		# 清除选中状态和样式
 		if card.is_selected:
 			card.is_selected = false
 			if card.sprite:
-				card.sprite.modulate = Color.WHITE  # 立即恢复颜色
+				card.sprite.modulate = Color.WHITE
 
-		# 设置卡牌为不可选择
+		# 设置为不可选择
 		card.is_selectable = false
 
-		# 断开信号连接（避免已出的牌还能被点击）
+		# 断开信号连接
 		if card.card_clicked.is_connected(_on_card_clicked):
 			card.card_clicked.disconnect(_on_card_clicked)
 
-		# 从手牌数组中移除
+		# 从手牌数组中移除（唯一数据源）
 		hand.erase(card)
 
-		# 从UI容器中移除（重要：确保从UI中移除）
+		# 从UI容器中移除
 		if card.get_parent() == hand_container:
 			hand_container.remove_child(card)
-			print("从hand_container移除卡牌：", card.get_card_name())
-
-		# 从选中列表中移除
-		if selected_cards.has(card):
-			selected_cards.erase(card)
-
-	# 清空选中列表（以防万一）
-	selected_cards.clear()
 
 	print("出牌后 - hand.size() = ", hand.size())
 
-	# 立即更新手牌显示（不使用动画，避免与出牌动画冲突）
+	# 更新手牌显示
 	update_hand_display(false)
 
-	# 验证：再次检查hand数组和UI是否同步
+	# 验证同步
 	verify_hand_sync()
 
 	# 发出信号
