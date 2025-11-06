@@ -218,6 +218,15 @@ func update_hand_display(animate: bool = true):
 	print("hand数组大小：", hand.size())
 	print("选中卡牌数：", get_selected_count())
 
+	# 验证：显示 hand 数组的顺序（仅人类玩家，前10张）
+	if player_type == PlayerType.HUMAN and hand.size() > 0:
+		print("hand数组当前顺序（前10张）：")
+		for i in range(min(10, hand.size())):
+			var c = hand[i]
+			print("  [%d] %s (对象ID=%s, is_selected=%s)" % [
+				i, c.get_card_name(), c.get_instance_id(), c.is_selected
+			])
+
 	# 步骤1：同步 hand_container 与 hand 数组
 	# 移除不在 hand 中的卡牌
 	var to_remove = []
@@ -290,10 +299,24 @@ func _on_card_clicked(card: Card):
 			print("    [%d] %s (对象ID=%s)" % [i, h.get_card_name(), h.get_instance_id()])
 		return
 
+	# 找到卡牌在 hand 数组中的索引
+	var card_index = hand.find(card)
+
 	print("\n========== [卡牌点击] ==========")
 	print("点击卡牌: %s (对象ID=%s)" % [card.get_card_name(), card.get_instance_id()])
+	print("  - 在hand数组中的索引: %d" % card_index)
+	print("  - 卡牌位置: (%d, %d)" % [int(card.position.x), int(card.position.y)])
 	print("  - 点击前 is_selected: %s" % card.is_selected)
 	print("  - 当前选中总数: %d" % get_selected_count())
+
+	# 显示 hand 数组的前5张和后5张
+	print("  - hand数组前5张:")
+	for i in range(min(5, hand.size())):
+		var c = hand[i]
+		var is_this = (c.get_instance_id() == card.get_instance_id())
+		print("    [%d] %s (对象ID=%s) %s" % [
+			i, c.get_card_name(), c.get_instance_id(), "← 当前点击" if is_this else ""
+		])
 
 	# 显示当前所有选中的卡牌（点击前）
 	if get_selected_count() > 0:
