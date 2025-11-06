@@ -66,10 +66,11 @@ func get_selected_count() -> int:
 	return count
 
 func clear_selection():
-	"""清除所有卡牌的选中状态"""
+	"""清除所有卡牌的选中状态（新架构）"""
 	for card in hand:
 		if card.is_selected:
 			card.set_selected(false)
+	selection_changed.emit(0)
 
 # =====================================
 # 卡牌管理
@@ -380,9 +381,4 @@ func set_card_selectable(selectable: bool):
 	for card in hand:
 		card.is_selectable = selectable
 
-func clear_selection():
-	"""清除所有选中的牌"""
-	for card in selected_cards:
-		card.set_selected(false)
-	selected_cards.clear()
-	selection_changed.emit(0)
+# clear_selection() 已在上面第68行定义（新架构版本）
