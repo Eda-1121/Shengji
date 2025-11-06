@@ -121,11 +121,17 @@ func receive_cards(cards: Array[Card]):
 
 func sort_hand(trump_last: bool = false, trump_suit: Card.Suit = Card.Suit.SPADE, current_rank: int = 2):
 	"""
-	排序手牌
+	排序手牌（验证：排序不会改变对象，只是重新排列顺序）
 	trump_last: true = 主牌放最后（出牌阶段），false = 主牌放最前（默认）
 	trump_suit: 主花色
 	current_rank: 当前等级
 	"""
+	# 验证：记录排序前的对象ID（仅人类玩家，前3张）
+	var before_ids = []
+	if player_type == PlayerType.HUMAN and hand.size() > 0:
+		for i in range(min(3, hand.size())):
+			before_ids.append(hand[i].get_instance_id())
+
 	hand.sort_custom(func(a, b):
 		# 如果主牌放最后
 		if trump_last:
@@ -162,6 +168,22 @@ func sort_hand(trump_last: bool = false, trump_suit: Card.Suit = Card.Suit.SPADE
 				return a.suit < b.suit
 			return a.rank < b.rank
 	)
+
+	# 验证：排序后对象ID是否还在（仅人类玩家）
+	if player_type == PlayerType.HUMAN and before_ids.size() > 0:
+		var all_ids_present = true
+		for id in before_ids:
+			var found = false
+			for card in hand:
+				if card.get_instance_id() == id:
+					found = true
+					break
+			if not found:
+				print("⚠ 警告：排序后对象ID %s 丢失！" % id)
+				all_ids_present = false
+
+		if not all_ids_present:
+			print("⚠ 排序导致对象丢失！这不应该发生！")
 
 func _get_trump_type(card: Card, trump_suit: Card.Suit, current_rank: int) -> int:
 	"""
@@ -261,28 +283,51 @@ func _on_card_clicked(card: Card):
 	# 检查卡牌是否在手牌中
 	if not hand.has(card):
 		print("⚠ 警告：点击的卡牌不在手牌中")
+		print("  - 点击卡牌: %s (对象ID=%s)" % [card.get_card_name(), card.get_instance_id()])
+		print("  - hand 数组前5张:")
+		for i in range(min(5, hand.size())):
+			var h = hand[i]
+			print("    [%d] %s (对象ID=%s)" % [i, h.get_card_name(), h.get_instance_id()])
 		return
 
-	print("\n[卡牌点击] %s (对象ID=%s)" % [card.get_card_name(), card.get_instance_id()])
-	print("  - 点击前状态: %s" % ("已选中" if card.is_selected else "未选中"))
-	print("  - 当前选中数: %d" % get_selected_count())
+	print("\n========== [卡牌点击] ==========")
+	print("点击卡牌: %s (对象ID=%s)" % [card.get_card_name(), card.get_instance_id()])
+	print("  - 点击前 is_selected: %s" % card.is_selected)
+	print("  - 当前选中总数: %d" % get_selected_count())
+
+	# 显示当前所有选中的卡牌（点击前）
+	if get_selected_count() > 0:
+		print("  - 点击前已选中的卡牌:")
+		var selected = get_selected_cards()
+		for i in range(selected.size()):
+			var c = selected[i]
+			print("    [%d] %s (对象ID=%s)" % [i, c.get_card_name(), c.get_instance_id()])
 
 	# 切换选中状态
 	if card.is_selected:
-		print("  - 操作: 取消选中")
+		print("  → 操作: 取消选中")
 		card.set_selected(false)
 		# 恢复原始z_index
 		var index = hand.find(card)
 		if index >= 0:
 			card.z_index = index
 	else:
-		print("  - 操作: 选中")
+		print("  → 操作: 选中")
 		card.set_selected(true)
 		# 提高z_index，确保选中的卡牌在最上层
 		card.z_index = 1000 + get_selected_count()
 
-	print("  - 点击后状态: %s" % ("已选中" if card.is_selected else "未选中"))
-	print("  - 当前选中数: %d" % get_selected_count())
+	print("  - 点击后 is_selected: %s" % card.is_selected)
+	print("  - 当前选中总数: %d" % get_selected_count())
+
+	# 显示当前所有选中的卡牌（点击后）
+	if get_selected_count() > 0:
+		print("  - 点击后已选中的卡牌:")
+		var selected = get_selected_cards()
+		for i in range(selected.size()):
+			var c = selected[i]
+			print("    [%d] %s (对象ID=%s)" % [i, c.get_card_name(), c.get_instance_id()])
+	print("================================\n")
 
 	# 发出信号
 	selection_changed.emit(get_selected_count())
