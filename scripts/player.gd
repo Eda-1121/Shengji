@@ -19,15 +19,18 @@ var is_dealer: bool = false
 
 # UI相关
 var hand_container: Node2D
-var card_spacing: float = 35.0  # 卡牌间距（恢复原始值）
+var card_spacing: float = 43.0  # 卡牌间距
 var selected_cards: Array[Card] = []
+
+const MIN_CARD_SPACING = 28.0
+const HAND_RIGHT_MARGIN = 14.0
 
 func _ready():
 	hand_container = Node2D.new()
 	hand_container.name = "HandContainer"
 	add_child(hand_container)
 
-func receive_cards(cards: Array[Card]):
+func receive_cards(cards: Array[Card], update_display_after_receive: bool = true):
 	for card in cards:
 		hand.append(card)
 
@@ -45,8 +48,8 @@ func receive_cards(cards: Array[Card]):
 			if not card.card_clicked.is_connected(_on_card_clicked):
 				card.card_clicked.connect(_on_card_clicked)
 
-	sort_hand()
-	update_hand_display()
+	if update_display_after_receive:
+		update_hand_display()
 
 func sort_hand(trump_last: bool = false, trump_suit: Card.Suit = Card.Suit.SPADE, current_rank: int = 2):
 	"""
@@ -55,6 +58,9 @@ func sort_hand(trump_last: bool = false, trump_suit: Card.Suit = Card.Suit.SPADE
 	trump_suit: 主花色
 	current_rank: 当前等级
 	"""
+	for card in hand:
+		card.set_trump(trump_suit, current_rank)
+
 	hand.sort_custom(func(a, b):
 		# 如果主牌放最后
 		if trump_last:
@@ -157,9 +163,10 @@ func update_hand_display(animate: bool = true):
 	print("清理后 - hand_container子节点数：", hand_container.get_child_count())
 
 	# 第三步：重新排列所有手牌位置
+	var effective_card_spacing = get_effective_card_spacing()
 	for i in range(hand.size()):
 		var card = hand[i]
-		var target_pos = Vector2(i * card_spacing, 0)
+		var target_pos = Vector2(i * effective_card_spacing, 0)
 
 		# 保存选中状态
 		var was_selected = card.is_selected
@@ -167,20 +174,36 @@ func update_hand_display(animate: bool = true):
 		if animate:
 			# 如果卡牌被选中，移动到偏移后的位置
 			if was_selected:
-				var offset_pos = Vector2(target_pos.x, target_pos.y - 30)  # SELECTED_HEIGHT = 30
+				var offset_pos = Vector2(target_pos.x, target_pos.y - Card.SELECTED_HEIGHT)
 				card.move_to_with_base(target_pos, offset_pos, 0.3)
 			else:
 				card.move_to(target_pos, 0.3)
 		else:
 			card.original_position = target_pos
 			if was_selected:
-				card.position = Vector2(target_pos.x, target_pos.y - 30)
+				card.position = Vector2(target_pos.x, target_pos.y - Card.SELECTED_HEIGHT)
 			else:
 				card.position = target_pos
 
 		card.z_index = i
 
 	print("=== update_hand_display 完成 ===") 
+
+func get_effective_card_spacing() -> float:
+	if hand.size() <= 1:
+		return card_spacing
+
+	var viewport_width = 1280.0
+	if is_inside_tree():
+		viewport_width = get_viewport_rect().size.x
+
+	var card_half_width = Card.CARD_WIDTH * Card.CARD_SCALE * 0.5
+	var available_width = viewport_width - global_position.x - card_half_width - HAND_RIGHT_MARGIN
+	if available_width <= 0:
+		return MIN_CARD_SPACING
+
+	var max_spacing = available_width / float(hand.size() - 1)
+	return clamp(max_spacing, MIN_CARD_SPACING, card_spacing)
 
 func _on_card_clicked(card: Card):
 	if player_type != PlayerType.HUMAN:

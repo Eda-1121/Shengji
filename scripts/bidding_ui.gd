@@ -24,14 +24,26 @@ func create_bidding_panel():
 	"""创建叫牌面板"""
 	# 主面板
 	bid_panel = Panel.new()
-	bid_panel.position = Vector2(400, 250)
-	bid_panel.size = Vector2(480, 180)
+	bid_panel.position = Vector2(280, 238)
+	bid_panel.size = Vector2(720, 190)
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.02, 0.10, 0.07, 0.92)
+	panel_style.border_color = Color(0.85, 0.82, 0.58, 0.45)
+	panel_style.border_width_left = 1
+	panel_style.border_width_top = 1
+	panel_style.border_width_right = 1
+	panel_style.border_width_bottom = 1
+	panel_style.corner_radius_top_left = 8
+	panel_style.corner_radius_top_right = 8
+	panel_style.corner_radius_bottom_left = 8
+	panel_style.corner_radius_bottom_right = 8
+	bid_panel.add_theme_stylebox_override("panel", panel_style)
 	add_child(bid_panel)
 
 	# 标题
 	var title_label = Label.new()
 	title_label.position = Vector2(20, 10)
-	title_label.size = Vector2(440, 30)
+	title_label.size = Vector2(680, 30)
 	title_label.text = "叫牌阶段"
 	title_label.add_theme_font_size_override("font_size", 24)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -40,7 +52,7 @@ func create_bidding_panel():
 	# 当前叫牌信息
 	current_bid_label = Label.new()
 	current_bid_label.position = Vector2(20, 50)
-	current_bid_label.size = Vector2(440, 25)
+	current_bid_label.size = Vector2(680, 25)
 	current_bid_label.text = "当前无人叫牌"
 	current_bid_label.add_theme_font_size_override("font_size", 18)
 	current_bid_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -48,10 +60,10 @@ func create_bidding_panel():
 
 	# 按钮容器（会根据可叫花色动态创建按钮）
 	button_container = HBoxContainer.new()
-	button_container.position = Vector2(40, 100)
-	button_container.size = Vector2(400, 50)
+	button_container.position = Vector2(30, 105)
+	button_container.size = Vector2(660, 50)
 	button_container.alignment = BoxContainer.ALIGNMENT_CENTER
-	button_container.add_theme_constant_override("separation", 15)
+	button_container.add_theme_constant_override("separation", 10)
 	bid_panel.add_child(button_container)
 
 func show_bidding_options(available_suits: Array, suit_counts: Dictionary = {}):

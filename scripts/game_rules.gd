@@ -46,7 +46,7 @@ static func identify_pattern(cards: Array[Card], trump_suit: Card.Suit, current_
 	var sorted_cards = cards.duplicate()
 	sorted_cards.sort_custom(func(a, b): 
 		if a.is_trump != b.is_trump:
-			return b.is_trump  # 主牌排前面
+			return a.is_trump  # 主牌排前面
 		if a.suit != b.suit:
 			return a.suit < b.suit
 		return a.rank < b.rank
@@ -58,8 +58,8 @@ static func identify_pattern(cards: Array[Card], trump_suit: Card.Suit, current_
 	
 	# 对子
 	if sorted_cards.size() == 2:
-		# 对子只需要rank相同即可，不需要花色相同
-		if sorted_cards[0].rank == sorted_cards[1].rank:
+		# 两副牌玩法中的对子必须是完全相同的两张牌
+		if sorted_cards[0].rank == sorted_cards[1].rank and sorted_cards[0].suit == sorted_cards[1].suit:
 			return PlayPattern.new(CardPattern.PAIR, sorted_cards)
 		else:
 			return PlayPattern.new(CardPattern.THROW, sorted_cards)
@@ -90,8 +90,8 @@ static func check_tractor(sorted_cards: Array[Card], trump_suit: Card.Suit, curr
 		var card1 = sorted_cards[i]
 		var card2 = sorted_cards[i + 1]
 
-		# 对子只需要rank相同即可
-		if card1.rank != card2.rank:
+		# 对子必须是同花色同点数
+		if card1.rank != card2.rank or card1.suit != card2.suit:
 			return null
 		
 		# 必须都是主牌或都是副牌
@@ -356,7 +356,7 @@ static func find_tractors_in_cards(cards: Array[Card], min_length: int, trump_su
 		card.set_trump(trump_suit, current_rank)
 	
 	var pairs = find_pairs_in_cards(cards)
-	var required_pairs = min_length / 2
+	var required_pairs = int(min_length / 2)
 	if pairs.size() < required_pairs:
 		return []
 	

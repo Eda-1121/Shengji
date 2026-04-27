@@ -24,23 +24,19 @@ func _ready():
 	var ui_script = load("res://scripts/ui_manager.gd")
 	ui_manager.set_script(ui_script)
 	add_child(ui_manager)
+	await get_tree().process_frame
 
 	# 创建游戏管理器
 	game_manager = Node.new()
 	game_manager.name = "GameManager"
 	var game_script = load("res://scripts/game_manager.gd")
 	game_manager.set_script(game_script)
-	add_child(game_manager)
+	game_manager.ui_manager = ui_manager
 	
 	# 连接基础UI信号
 	ui_manager.play_cards_pressed.connect(game_manager._on_play_cards_pressed)
 	ui_manager.bury_cards_pressed.connect(game_manager._on_bury_cards_pressed)
-	game_manager.ui_manager = ui_manager
-	
-	# 等待UI组件创建完成
-	await get_tree().process_frame
-	await get_tree().process_frame
-	
+
 	# 连接叫牌UI信号
 	if ui_manager.has_node("BiddingUI"):
 		var bidding_ui = ui_manager.get_node("BiddingUI")
@@ -53,6 +49,8 @@ func _ready():
 		game_over_ui.restart_game.connect(game_manager.restart_game)
 		game_over_ui.quit_game.connect(_on_quit_game)
 
+	add_child(game_manager)
+
 	# 连接玩家1的选牌信号
 	await get_tree().process_frame
 	if game_manager.players.size() > 0:
@@ -62,7 +60,9 @@ func _ready():
 
 func _on_player_selection_changed(count: int):
 	"""当玩家选牌数量变化时"""
-	if ui_manager:
+	if game_manager and game_manager.has_method("on_human_selection_changed"):
+		game_manager.on_human_selection_changed(count)
+	elif ui_manager:
 		ui_manager.update_selected_count(count, 8)
 
 func _on_quit_game():

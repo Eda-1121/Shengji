@@ -34,10 +34,12 @@ var area_2d: Area2D
 # 动画参数
 const FLIP_DURATION = 0.3
 const FLIP_HALF_TIME = 0.15
-const CARD_SCALE = 1.0  # 卡牌整体缩放比例（恢复原始大小）
-const HOVER_HEIGHT = 25  # 悬停高度
-const HOVER_SCALE = 1.15  # 悬停时额外的缩放比例
-const SELECTED_HEIGHT = 30  # 选中时的向上偏移高度
+const CARD_SCALE = 1.34  # 卡牌整体缩放比例
+const CARD_WIDTH = 100.0
+const CARD_HEIGHT = 140.0
+const HOVER_HEIGHT = 28  # 悬停高度
+const HOVER_SCALE = 1.08  # 悬停时额外的缩放比例
+const SELECTED_HEIGHT = 38  # 选中时的向上偏移高度
 
 # 交互状态
 var is_selectable: bool = true
@@ -92,6 +94,9 @@ func _setup_area2d():
 	else:
 		area_2d = get_node("Area2D")
 		collision_shape = area_2d.get_node("CollisionShape2D")
+		if collision_shape.shape is RectangleShape2D:
+			collision_shape.shape.size = Vector2(35 * CARD_SCALE, 90 * CARD_SCALE)
+		collision_shape.position = Vector2(-12.5 * CARD_SCALE, 0)
 
 # ============================================
 # 基础属性方法
@@ -202,14 +207,14 @@ func _animate_flip(_from_texture: Texture2D, to_texture: Texture2D):
 	
 	tween.tween_property(sprite, "scale:x", 0.0, FLIP_HALF_TIME)
 	tween.tween_callback(func(): sprite.texture = to_texture)
-	tween.tween_property(sprite, "scale:x", 1.0, FLIP_HALF_TIME)
+	tween.tween_property(sprite, "scale:x", CARD_SCALE, FLIP_HALF_TIME)
 	tween.tween_callback(func(): flip_completed.emit(self))
 
 func set_face_up(face_up: bool, instant: bool = false):
 	if instant:
 		is_face_up = face_up
 		sprite.texture = front_texture if face_up else back_texture
-		sprite.scale.x = 1.0
+		sprite.scale = Vector2(CARD_SCALE, CARD_SCALE)
 	else:
 		if face_up and not is_face_up:
 			flip_to_front()
