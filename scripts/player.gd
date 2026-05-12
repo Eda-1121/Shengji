@@ -23,7 +23,7 @@ var card_spacing: float = 43.0  # 卡牌间距
 var selected_cards: Array[Card] = []
 
 const MIN_CARD_SPACING = 28.0
-const HAND_RIGHT_MARGIN = 14.0
+const HAND_SIDE_MARGIN = 14.0
 
 func _ready():
 	hand_container = Node2D.new()
@@ -164,9 +164,11 @@ func update_hand_display(animate: bool = true):
 
 	# 第三步：重新排列所有手牌位置
 	var effective_card_spacing = get_effective_card_spacing()
+	var row_width = effective_card_spacing * float(max(hand.size() - 1, 0))
+	var start_x = -row_width * 0.5
 	for i in range(hand.size()):
 		var card = hand[i]
-		var target_pos = Vector2(i * effective_card_spacing, 0)
+		var target_pos = Vector2(start_x + i * effective_card_spacing, 0)
 
 		# 保存选中状态
 		var was_selected = card.is_selected
@@ -198,11 +200,11 @@ func get_effective_card_spacing() -> float:
 		viewport_width = get_viewport_rect().size.x
 
 	var card_half_width = Card.CARD_WIDTH * Card.CARD_SCALE * 0.5
-	var available_width = viewport_width - global_position.x - card_half_width - HAND_RIGHT_MARGIN
-	if available_width <= 0:
+	var available_span = viewport_width - (card_half_width + HAND_SIDE_MARGIN) * 2.0
+	if available_span <= 0:
 		return MIN_CARD_SPACING
 
-	var max_spacing = available_width / float(hand.size() - 1)
+	var max_spacing = available_span / float(hand.size() - 1)
 	return clamp(max_spacing, MIN_CARD_SPACING, card_spacing)
 
 func _on_card_clicked(card: Card):

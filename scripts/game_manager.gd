@@ -33,13 +33,17 @@ var max_bidding_rounds: int = 8  # 每人最多叫2次
 # 游戏统计
 var total_rounds_played: int = 0
 
-# 出牌区域 - 围绕屏幕中心(640, 360)的十字形布局，适配1280x720屏幕
+# 出牌区域 - 围绕屏幕中心留出足够空间，适配放大后的卡牌
 var play_area_positions = [
-	Vector2(560, 365),   # 玩家1（人类）- 下方中央
-	Vector2(350, 350),   # 玩家2（AI）- 左侧中央
-	Vector2(560, 255),   # 玩家3（AI）- 上方中央
-	Vector2(820, 350)    # 玩家4（AI）- 右侧中央
+	Vector2(640, 462),   # 玩家1（人类）- 下方中央
+	Vector2(350, 360),   # 玩家2（AI）- 左侧中央
+	Vector2(640, 228),   # 玩家3（AI）- 上方中央
+	Vector2(930, 360)    # 玩家4（AI）- 右侧中央
 ]
+
+const PLAYED_CARD_SPACING = 42.0
+const PLAYED_CARD_MIN_SPACING = 30.0
+const PLAYED_CARD_MAX_WIDTH = 230.0
 
 # UI管理器引用
 var ui_manager = null
@@ -60,7 +64,7 @@ func initialize_game():
 	print("=== 初始化游戏：使用 ", num_decks, " 副牌 ===")
 	# 玩家位置：玩家1在下方居中，其他AI玩家位置不变
 	var player_positions = [
-		Vector2(172, 558),   # 玩家1（人类）- 下方居中，给下方出牌按钮留出空间
+		Vector2(640, 558),   # 玩家1（人类）- 下方居中，给下方出牌按钮留出空间
 		Vector2(50, 280),    # 玩家2（AI）- 左侧
 		Vector2(100, 50),    # 玩家3（AI）- 上方
 		Vector2(1050, 280)   # 玩家4（AI）- 右侧
@@ -680,15 +684,9 @@ func _on_bury_cards_pressed():
 
 func auto_bury_for_player(dealer: Player):
 	"""自动埋底"""
-	var sorted_hand = dealer.hand.duplicate()
-	sorted_hand.sort_custom(func(a, b): 
-		a.set_trump(trump_suit, current_level)
-		b.set_trump(trump_suit, current_level)
-		return a.compare_to(b, trump_suit, current_level) < 0
-	)
+	var bury_cards = choose_ai_bury_cards(dealer)
 	
-	for i in range(min(8, sorted_hand.size())):
-		var card = sorted_hand[i]
+	for card in bury_cards:
 		bottom_cards.append(card)
 		dealer.hand.erase(card)
 		if card.get_parent():
@@ -727,6 +725,39 @@ func ai_bury_bottom():
 	await get_tree().create_timer(1.5).timeout
 	print("调用 auto_bury_for_player()")
 	await auto_bury_for_player(dealer)
+
+func choose_ai_bury_cards(dealer: Player) -> Array:
+	var sorted_hand = dealer.hand.duplicate()
+	sorted_hand.sort_custom(func(a, b):
+		return get_ai_bury_score(a, dealer.hand) > get_ai_bury_score(b, dealer.hand)
+	)
+	return sorted_hand.slice(0, min(8, sorted_hand.size()))
+
+func get_ai_bury_score(card: Card, hand: Array[Card]) -> float:
+	card.set_trump(trump_suit, current_level)
+	var score = 100.0 - get_ai_card_cost(card)
+
+	if card.is_trump:
+		score -= 80.0
+	if card.rank == current_level:
+		score -= 70.0
+	if card.suit == Card.Suit.JOKER:
+		score -= 120.0
+	if card.points > 0:
+		score -= float(card.points) * 8.0
+	if is_card_part_of_pair(card, hand):
+		score -= 28.0
+
+	return score
+
+func is_card_part_of_pair(card: Card, hand: Array[Card]) -> bool:
+	var count = 0
+	for hand_card in hand:
+		if hand_card.rank == card.rank and hand_card.suit == card.suit:
+			count += 1
+			if count >= 2:
+				return true
+	return false
 
 # =====================================
 # 出牌阶段
@@ -952,7 +983,10 @@ func can_beat_card(card1: Card, card2: Card) -> bool:
 
 func show_played_cards(player_id: int, cards: Array):
 	"""显示出的牌"""
-	var position = play_area_positions[player_id]
+	var center_position = play_area_positions[player_id]
+	var spacing = get_played_card_spacing(cards.size())
+	var row_width = spacing * float(max(cards.size() - 1, 0))
+	var start_position = center_position - Vector2(row_width * 0.5, 0)
 
 	for i in range(cards.size()):
 		var card = cards[i]
@@ -961,14 +995,25 @@ func show_played_cards(player_id: int, cards: Array):
 			card.get_parent().remove_child(card)
 		add_child(card)
 
-		# 使用全局坐标，确保牌显示在正确的屏幕位置
-		card.global_position = position + Vector2(i * 24, 0)
-		card.z_index = 100
+		# 以该玩家的牌池位置为中心，动态压缩间距，避免多张牌超出或不规整
+		card.global_position = start_position + Vector2(i * spacing, 0)
+		card.z_index = 100 + i
 		card.visible = true
 		card.set_face_up(true, true)
 
 		# 禁用已出牌的交互事件
 		card.is_selectable = false
+
+func get_played_card_spacing(card_count: int) -> float:
+	if card_count <= 1:
+		return 0.0
+
+	var spacing = PLAYED_CARD_SPACING
+	var total_width = spacing * float(card_count - 1)
+	if total_width > PLAYED_CARD_MAX_WIDTH:
+		spacing = PLAYED_CARD_MAX_WIDTH / float(card_count - 1)
+
+	return max(spacing, PLAYED_CARD_MIN_SPACING)
 
 func next_player_turn():
 	"""下一个玩家"""
@@ -998,29 +1043,7 @@ func ai_play_turn(ai_player: Player):
 	for card in ai_player.hand:
 		card.set_trump(trump_suit, current_level)
 	
-	var cards_to_play: Array = []
-	
-	if current_trick.is_empty():
-		# 首家出牌：出最大的单张
-		if ai_player.hand.size() > 0:
-			var sorted_hand = ai_player.hand.duplicate()
-			sorted_hand.sort_custom(func(a, b): 
-				return a.compare_to(b, trump_suit, current_level) > 0
-			)
-			cards_to_play = [sorted_hand[0]]
-	else:
-		# 跟牌
-		var lead_pattern = current_trick[0]["pattern"]
-		var valid_plays = GameRules.get_valid_follow_cards(ai_player.hand, lead_pattern, trump_suit, current_level)
-		
-		if valid_plays.size() > 0:
-			cards_to_play = valid_plays[0]
-		elif ai_player.hand.size() >= lead_pattern.length:
-			var sorted_hand = ai_player.hand.duplicate()
-			sorted_hand.sort_custom(func(a, b): 
-				return a.compare_to(b, trump_suit, current_level) < 0
-			)
-			cards_to_play = sorted_hand.slice(0, lead_pattern.length)
+	var cards_to_play = choose_ai_play(ai_player)
 	
 	if cards_to_play.size() > 0:
 		for card in cards_to_play:
@@ -1048,6 +1071,356 @@ func ai_play_turn(ai_player: Player):
 			evaluate_trick()
 		else:
 			next_player_turn()
+
+func choose_ai_play(ai_player: Player) -> Array:
+	"""规则型AI：首出保留强牌，跟牌时按队友/对手当前赢牌状态决策"""
+	if ai_player.hand.is_empty():
+		return []
+
+	if current_trick.is_empty():
+		return choose_ai_lead_play(ai_player)
+
+	return choose_ai_follow_play(ai_player)
+
+func choose_ai_lead_play(ai_player: Player) -> Array:
+	var candidates = get_ai_lead_candidates(ai_player.hand)
+	if candidates.is_empty():
+		var sorted_hand = sort_cards_by_strength(ai_player.hand, true)
+		return [sorted_hand[0]]
+
+	var best_candidate = candidates[0]
+	var best_score = INF
+	for candidate in candidates:
+		var score = score_ai_lead_candidate(candidate)
+		if score < best_score:
+			best_score = score
+			best_candidate = candidate
+
+	return best_candidate
+
+func choose_ai_follow_play(ai_player: Player) -> Array:
+	var lead_pattern = current_trick[0]["pattern"]
+	var candidates = get_ai_follow_candidates(ai_player.hand, lead_pattern)
+	if candidates.is_empty():
+		var sorted_hand = sort_cards_by_strength(ai_player.hand, true)
+		return sorted_hand.slice(0, min(lead_pattern.length, sorted_hand.size()))
+
+	var winning_play = get_current_winning_play()
+	var winning_player = players[winning_play["player_id"]]
+	var teammate_winning = winning_player.team == ai_player.team
+	var trick_points = get_current_trick_points()
+	var has_winning_candidate = false
+
+	if not teammate_winning:
+		for candidate in candidates:
+			if does_candidate_beat_winning_play(candidate, winning_play):
+				has_winning_candidate = true
+				break
+
+	var best_candidate = candidates[0]
+	var best_score = INF
+	for candidate in candidates:
+		var can_beat = does_candidate_beat_winning_play(candidate, winning_play)
+		var score = score_ai_follow_candidate(candidate, teammate_winning, has_winning_candidate, can_beat, trick_points)
+		if score < best_score:
+			best_score = score
+			best_candidate = candidate
+
+	return best_candidate
+
+func get_ai_lead_candidates(hand: Array[Card]) -> Array:
+	var candidates = []
+	var sorted_hand = sort_cards_by_strength(hand, true)
+
+	for card in sorted_hand:
+		append_ai_lead_candidate(candidates, [card], hand)
+
+	var pairs = GameRules.find_pairs_in_cards(hand)
+	sort_candidate_list_by_cost(pairs)
+	for pair in pairs:
+		append_ai_lead_candidate(candidates, pair, hand)
+
+	var tractors = GameRules.find_tractors_in_cards(hand, 4, trump_suit, current_level)
+	sort_candidate_list_by_cost(tractors)
+	for tractor in tractors:
+		append_ai_lead_candidate(candidates, tractor, hand)
+
+	return candidates
+
+func get_ai_follow_candidates(hand: Array[Card], lead_pattern: GameRules.PlayPattern) -> Array:
+	var candidates = []
+	var needed = lead_pattern.length
+	var same_suit_cards = get_same_suit_cards_for_lead(hand, lead_pattern)
+
+	match lead_pattern.pattern_type:
+		GameRules.CardPattern.SINGLE:
+			var source = same_suit_cards if not same_suit_cards.is_empty() else hand
+			for card in sort_cards_by_strength(source, true):
+				append_ai_follow_candidate(candidates, [card], hand, lead_pattern)
+
+		GameRules.CardPattern.PAIR:
+			var pairs = GameRules.find_pairs_in_cards(same_suit_cards)
+			sort_candidate_list_by_cost(pairs)
+			for pair in pairs:
+				append_ai_follow_candidate(candidates, pair, hand, lead_pattern)
+
+			if pairs.is_empty():
+				append_count_based_follow_candidates(candidates, same_suit_cards, hand, needed, lead_pattern)
+
+		GameRules.CardPattern.TRACTOR:
+			var tractors = GameRules.find_tractors_in_cards(same_suit_cards, needed, trump_suit, current_level)
+			sort_candidate_list_by_cost(tractors)
+			for tractor in tractors:
+				append_ai_follow_candidate(candidates, tractor, hand, lead_pattern)
+
+			if tractors.is_empty():
+				var pair_preferred = build_pair_preferred_candidate(same_suit_cards, needed)
+				append_ai_follow_candidate(candidates, pair_preferred, hand, lead_pattern)
+				append_count_based_follow_candidates(candidates, same_suit_cards, hand, needed, lead_pattern)
+
+		_:
+			append_count_based_follow_candidates(candidates, same_suit_cards, hand, needed, lead_pattern)
+
+	if candidates.is_empty():
+		for candidate in GameRules.get_valid_follow_cards(hand, lead_pattern, trump_suit, current_level):
+			append_ai_follow_candidate(candidates, candidate, hand, lead_pattern)
+
+	return candidates
+
+func append_count_based_follow_candidates(candidates: Array, same_suit_cards: Array[Card], hand: Array[Card], needed: int, lead_pattern: GameRules.PlayPattern):
+	if same_suit_cards.size() >= needed:
+		append_ai_follow_candidate(candidates, take_low_cards(same_suit_cards, needed), hand, lead_pattern)
+		append_ai_follow_candidate(candidates, take_high_cards(same_suit_cards, needed), hand, lead_pattern)
+		append_ai_follow_candidate(candidates, take_point_heavy_cards(same_suit_cards, needed), hand, lead_pattern)
+	else:
+		var base = sort_cards_by_strength(same_suit_cards, true)
+		var fillers = get_cards_except(hand, base)
+		append_ai_follow_candidate(candidates, base + take_low_cards(fillers, needed - base.size()), hand, lead_pattern)
+		append_ai_follow_candidate(candidates, base + take_point_heavy_cards(fillers, needed - base.size()), hand, lead_pattern)
+
+func append_ai_lead_candidate(candidates: Array, cards: Array, hand: Array[Card]):
+	var typed_cards = normalize_card_list(cards)
+	if typed_cards.is_empty() or not GameRules.validate_play(typed_cards, hand):
+		return
+
+	var pattern = GameRules.identify_pattern(typed_cards, trump_suit, current_level)
+	if pattern.pattern_type == GameRules.CardPattern.INVALID or pattern.pattern_type == GameRules.CardPattern.THROW:
+		return
+
+	append_unique_candidate(candidates, typed_cards)
+
+func append_ai_follow_candidate(candidates: Array, cards: Array, hand: Array[Card], lead_pattern: GameRules.PlayPattern):
+	var typed_cards = normalize_card_list(cards)
+	if typed_cards.size() != lead_pattern.length or not GameRules.validate_play(typed_cards, hand):
+		return
+
+	var pattern = GameRules.identify_pattern(typed_cards, trump_suit, current_level)
+	if pattern.pattern_type == GameRules.CardPattern.INVALID:
+		return
+
+	if not GameRules.can_follow(pattern, lead_pattern, hand, trump_suit, current_level):
+		return
+
+	append_unique_candidate(candidates, typed_cards)
+
+func normalize_card_list(cards: Array) -> Array[Card]:
+	var typed_cards: Array[Card] = []
+	for card in cards:
+		if card is Card and not typed_cards.has(card):
+			typed_cards.append(card)
+	return typed_cards
+
+func append_unique_candidate(candidates: Array, cards: Array[Card]):
+	for candidate in candidates:
+		if has_same_cards(candidate, cards):
+			return
+	candidates.append(cards)
+
+func has_same_cards(cards_a: Array, cards_b: Array) -> bool:
+	if cards_a.size() != cards_b.size():
+		return false
+	for card in cards_a:
+		if not cards_b.has(card):
+			return false
+	return true
+
+func get_same_suit_cards_for_lead(hand: Array[Card], lead_pattern: GameRules.PlayPattern) -> Array[Card]:
+	var same_suit_cards: Array[Card] = []
+	var lead_card = lead_pattern.cards[0]
+	lead_card.set_trump(trump_suit, current_level)
+
+	for card in hand:
+		card.set_trump(trump_suit, current_level)
+		if lead_card.is_trump:
+			if card.is_trump:
+				same_suit_cards.append(card)
+		elif not card.is_trump and card.suit == lead_card.suit:
+			same_suit_cards.append(card)
+
+	return same_suit_cards
+
+func sort_cards_by_strength(cards: Array, ascending: bool) -> Array:
+	var sorted_cards = cards.duplicate()
+	for card in sorted_cards:
+		card.set_trump(trump_suit, current_level)
+
+	sorted_cards.sort_custom(func(a, b):
+		var result = a.compare_to(b, trump_suit, current_level)
+		if result == 0:
+			if a.suit != b.suit:
+				return a.suit < b.suit if ascending else a.suit > b.suit
+			return a.rank < b.rank if ascending else a.rank > b.rank
+		return result < 0 if ascending else result > 0
+	)
+	return sorted_cards
+
+func sort_candidate_list_by_cost(candidates: Array):
+	candidates.sort_custom(func(a, b):
+		return get_ai_play_cost(a) < get_ai_play_cost(b)
+	)
+
+func take_low_cards(cards: Array, count: int) -> Array:
+	if count <= 0:
+		return []
+	return sort_cards_by_strength(cards, true).slice(0, min(count, cards.size()))
+
+func take_high_cards(cards: Array, count: int) -> Array:
+	if count <= 0:
+		return []
+	return sort_cards_by_strength(cards, false).slice(0, min(count, cards.size()))
+
+func take_point_heavy_cards(cards: Array, count: int) -> Array:
+	if count <= 0:
+		return []
+
+	var sorted_cards = cards.duplicate()
+	sorted_cards.sort_custom(func(a, b):
+		if a.points != b.points:
+			return a.points > b.points
+		return get_ai_card_cost(a) < get_ai_card_cost(b)
+	)
+	return sorted_cards.slice(0, min(count, sorted_cards.size()))
+
+func get_cards_except(cards: Array[Card], excluded: Array) -> Array[Card]:
+	var result: Array[Card] = []
+	for card in cards:
+		if not excluded.has(card):
+			result.append(card)
+	return result
+
+func build_pair_preferred_candidate(cards: Array[Card], needed: int) -> Array:
+	var result = []
+	var pairs = GameRules.find_pairs_in_cards(cards)
+	sort_candidate_list_by_cost(pairs)
+
+	for pair in pairs:
+		if result.size() + pair.size() <= needed:
+			result.append_array(pair)
+		if result.size() >= needed:
+			return result.slice(0, needed)
+
+	for card in sort_cards_by_strength(cards, true):
+		if not result.has(card):
+			result.append(card)
+		if result.size() >= needed:
+			break
+
+	return result
+
+func score_ai_lead_candidate(cards: Array) -> float:
+	var pattern = GameRules.identify_pattern(normalize_card_list(cards), trump_suit, current_level)
+	var score = get_ai_play_cost(cards)
+	score += float(GameRules.calculate_points(cards)) * 2.2
+	score -= float(cards.size() - 1) * 4.0
+
+	if is_all_trump_cards(cards):
+		score += 35.0
+	else:
+		score -= 12.0
+
+	match pattern.pattern_type:
+		GameRules.CardPattern.PAIR:
+			score -= 8.0
+		GameRules.CardPattern.TRACTOR:
+			score -= 16.0
+
+	return score
+
+func score_ai_follow_candidate(cards: Array, teammate_winning: bool, has_winning_candidate: bool, can_beat: bool, trick_points: int) -> float:
+	var cost = get_ai_play_cost(cards)
+	var points = float(GameRules.calculate_points(cards))
+
+	if teammate_winning:
+		var score = cost - points * 6.0
+		if can_beat:
+			score += 140.0 + cost
+		return score
+
+	if has_winning_candidate:
+		if can_beat:
+			return cost - float(trick_points) * 3.0 - points * 1.5
+		return 10000.0 + cost + points * 5.0
+
+	return cost + points * 5.0
+
+func get_ai_card_cost(card: Card) -> float:
+	card.set_trump(trump_suit, current_level)
+	var cost = float(card.rank)
+
+	if card.suit == Card.Suit.JOKER:
+		cost += 55.0
+	elif card.rank == current_level:
+		cost += 30.0
+	elif card.is_trump:
+		cost += 18.0
+
+	cost += float(card.points) * 0.8
+	return cost
+
+func get_ai_play_cost(cards: Array) -> float:
+	var cost = 0.0
+	for card in cards:
+		if card is Card:
+			cost += get_ai_card_cost(card)
+	return cost
+
+func is_all_trump_cards(cards: Array) -> bool:
+	if cards.is_empty():
+		return false
+	for card in cards:
+		card.set_trump(trump_suit, current_level)
+		if not card.is_trump:
+			return false
+	return true
+
+func get_current_winning_play() -> Dictionary:
+	if current_trick.is_empty():
+		return {}
+
+	var winning_play = current_trick[0]
+	for i in range(1, current_trick.size()):
+		var play = current_trick[i]
+		if GameRules.compare_plays(winning_play["pattern"], play["pattern"], trump_suit, current_level) < 0:
+			winning_play = play
+
+	return winning_play
+
+func does_candidate_beat_winning_play(cards: Array, winning_play: Dictionary) -> bool:
+	if winning_play.is_empty():
+		return true
+
+	var typed_cards = normalize_card_list(cards)
+	var pattern = GameRules.identify_pattern(typed_cards, trump_suit, current_level)
+	if pattern.pattern_type == GameRules.CardPattern.INVALID:
+		return false
+
+	return GameRules.compare_plays(winning_play["pattern"], pattern, trump_suit, current_level) < 0
+
+func get_current_trick_points() -> int:
+	var points = 0
+	for play in current_trick:
+		points += GameRules.calculate_points(play["cards"])
+	return points
 
 func evaluate_trick():
 	"""评估本轮"""
