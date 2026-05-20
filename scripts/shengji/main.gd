@@ -21,7 +21,7 @@ func _ready():
 	# 创建UI管理器
 	ui_manager = CanvasLayer.new()
 	ui_manager.name = "UIManager"
-	var ui_script = load("res://scripts/ui_manager.gd")
+	var ui_script = load("res://scripts/shengji/ui_manager.gd")
 	ui_manager.set_script(ui_script)
 	add_child(ui_manager)
 	await get_tree().process_frame
@@ -29,7 +29,7 @@ func _ready():
 	# 创建游戏管理器
 	game_manager = Node.new()
 	game_manager.name = "GameManager"
-	var game_script = load("res://scripts/game_manager.gd")
+	var game_script = load("res://scripts/shengji/game_manager.gd")
 	game_manager.set_script(game_script)
 	game_manager.ui_manager = ui_manager
 	

@@ -9,10 +9,10 @@ signal move_completed(card: Card)
 
 # 枚举定义
 enum Suit { SPADE, HEART, CLUB, DIAMOND, JOKER }
-enum Rank { 
-	TWO = 2, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, 
-	NINE, TEN, JACK, QUEEN, KING, ACE, 
-	SMALL_JOKER = 14, BIG_JOKER = 15 
+enum Rank {
+	TWO = 2, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT,
+	NINE, TEN, JACK, QUEEN, KING, ACE = 14,
+	SMALL_JOKER = 16, BIG_JOKER = 17
 }
 
 # 卡牌属性
@@ -46,6 +46,10 @@ var is_selectable: bool = true
 var is_selected: bool = false
 var is_hovering: bool = false
 var original_position: Vector2
+
+# ヒントオーバーレイ（埋底・出牌共用）
+var _bury_hint: Sprite2D = null
+var _play_hint: Sprite2D = null
 
 # ============================================
 # 初始化
@@ -125,7 +129,7 @@ func get_display_name() -> String:
 	var rank_cn = {
 		2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7", 8: "8",
 		9: "9", 10: "10", 11: "J", 12: "Q", 13: "K", 14: "A",
-		15: "小王", 16: "大王"
+		16: "小王", 17: "大王"
 	}
 	
 	if suit == Suit.JOKER:
@@ -341,9 +345,9 @@ func toggle_selected():
 func _on_area_input_event(_viewport: Node, event: InputEvent, _shape_idx: int):
 	if not is_selectable:
 		return
-	
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			SoundManager.play_card_click()
 			card_clicked.emit(self)
 
 func _on_mouse_entered():
@@ -396,3 +400,45 @@ func compare_to(other: Card, trump_suit: Suit, current_rank: int) -> int:
 
 func _to_string() -> String:
 	return "Card(%s, trump=%s, points=%d)" % [get_display_name(), is_trump, points]
+
+# ============================================
+# 埋底ヒント
+# ============================================
+
+func set_bury_hint(level: int):
+	# level: 0=なし, 1=安全(緑), 2=注意(黄), 3=NG(赤)
+	if _bury_hint:
+		_bury_hint.queue_free()
+		_bury_hint = null
+	if level == 0:
+		return
+	var hint_colors = [
+		Color.WHITE,
+		Color(0.10, 0.90, 0.10, 0.22),
+		Color(0.95, 0.85, 0.05, 0.26),
+		Color(0.95, 0.15, 0.15, 0.28),
+	]
+	var img = Image.create(int(CARD_WIDTH), int(CARD_HEIGHT), false, Image.FORMAT_RGBA8)
+	img.fill(hint_colors[level])
+	_bury_hint = Sprite2D.new()
+	_bury_hint.texture = ImageTexture.create_from_image(img)
+	_bury_hint.scale = Vector2(CARD_SCALE, CARD_SCALE)
+	_bury_hint.z_index = 3
+	add_child(_bury_hint)
+
+func clear_bury_hint():
+	set_bury_hint(0)
+
+func set_play_hint(show: bool):
+	if _play_hint:
+		_play_hint.queue_free()
+		_play_hint = null
+	if not show:
+		return
+	var img = Image.create(int(CARD_WIDTH), int(CARD_HEIGHT), false, Image.FORMAT_RGBA8)
+	img.fill(Color(0.25, 0.65, 1.00, 0.28))
+	_play_hint = Sprite2D.new()
+	_play_hint.texture = ImageTexture.create_from_image(img)
+	_play_hint.scale = Vector2(CARD_SCALE, CARD_SCALE)
+	_play_hint.z_index = 4
+	add_child(_play_hint)

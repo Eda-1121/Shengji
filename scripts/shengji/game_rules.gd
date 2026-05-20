@@ -42,11 +42,12 @@ static func identify_pattern(cards: Array[Card], trump_suit: Card.Suit, current_
 	for card in cards:
 		card.set_trump(trump_suit, current_rank)
 	
-	# 按点数和花色排序
 	var sorted_cards = cards.duplicate()
-	sorted_cards.sort_custom(func(a, b): 
+	sorted_cards.sort_custom(func(a, b):
 		if a.is_trump != b.is_trump:
-			return a.is_trump  # 主牌排前面
+			return a.is_trump  # 主牌を前に
+		if a.is_trump:
+			return _get_trump_order(a, trump_suit, current_rank) < _get_trump_order(b, trump_suit, current_rank)
 		if a.suit != b.suit:
 			return a.suit < b.suit
 		return a.rank < b.rank
@@ -73,16 +74,36 @@ static func identify_pattern(cards: Array[Card], trump_suit: Card.Suit, current_
 	# 甩牌
 	return PlayPattern.new(CardPattern.THROW, sorted_cards)
 
+static func _get_trump_order(card: Card, trump_suit: Card.Suit, current_rank: int) -> int:
+	# ジョーカー: 最強（小王16 < 大王17）
+	if card.suit == Card.Suit.JOKER:
+		return 1000 + card.rank
+	# 主花色レベル牌
+	if card.rank == current_rank and card.suit == trump_suit:
+		return 900
+	# 非主花色レベル牌（花色順）
+	if card.rank == current_rank:
+		return 800 + int(card.suit)
+	# 通常の主花色牌（2〜A）
+	return card.rank
+
+static func _are_ranks_adjacent(rank1: int, rank2: int, current_rank: int, is_trump: bool) -> bool:
+	var low = min(rank1, rank2)
+	var high = max(rank1, rank2)
+	if high - low == 1:
+		return true
+	# 主牌の場合、级别牌が間に挟まる2つの牌は隣接とみなす (例: レベル10なら9と11は隣接)
+	if is_trump and high - low == 2 and current_rank == low + 1:
+		return true
+	return false
+
 static func check_tractor(sorted_cards: Array[Card], trump_suit: Card.Suit, current_rank: int) -> PlayPattern:
-	"""检查是否是拖拉机（连对）"""
 	if sorted_cards.size() % 2 != 0:
 		return null
-	
-	# 更新主牌状态
+
 	for card in sorted_cards:
 		card.set_trump(trump_suit, current_rank)
-	
-	# 检查是否全部是对子
+
 	var pairs = []
 	for i in range(0, sorted_cards.size(), 2):
 		if i + 1 >= sorted_cards.size():
@@ -90,36 +111,35 @@ static func check_tractor(sorted_cards: Array[Card], trump_suit: Card.Suit, curr
 		var card1 = sorted_cards[i]
 		var card2 = sorted_cards[i + 1]
 
-		# 对子必须是同花色同点数
 		if card1.rank != card2.rank or card1.suit != card2.suit:
 			return null
-		
-		# 必须都是主牌或都是副牌
+
 		if card1.is_trump != card2.is_trump:
 			return null
-		
+
 		pairs.append({
 			"rank": card1.rank,
 			"suit": card1.suit,
 			"is_trump": card1.is_trump
 		})
-	
-	# 检查对子是否连续
+
 	for i in range(pairs.size() - 1):
 		var curr_pair = pairs[i]
 		var next_pair = pairs[i + 1]
-		
-		# 必须是相同花色或都是主牌
+
 		if curr_pair["is_trump"] != next_pair["is_trump"]:
 			return null
-		
+
 		if not curr_pair["is_trump"] and curr_pair["suit"] != next_pair["suit"]:
 			return null
-		
-		# 点数必须连续
-		if next_pair["rank"] - curr_pair["rank"] != 1:
+
+		# 级别牌は通常の連続順から除外されるため、隣接判定はスキップして別途チェック
+		if curr_pair["rank"] == current_rank or next_pair["rank"] == current_rank:
 			return null
-	
+
+		if not _are_ranks_adjacent(curr_pair["rank"], next_pair["rank"], current_rank, curr_pair["is_trump"]):
+			return null
+
 	return PlayPattern.new(CardPattern.TRACTOR, sorted_cards)
 
 # ============================================
@@ -376,17 +396,20 @@ static func find_tractors_in_cards(cards: Array[Card], min_length: int, trump_su
 				var prev_pair = pairs[i + j - 1]
 				var curr_pair = pairs[pair_idx]
 				
-				# 检查是否同花色（或都是主牌）
 				if prev_pair[0].is_trump != curr_pair[0].is_trump:
 					is_valid = false
 					break
-				
+
 				if not prev_pair[0].is_trump and prev_pair[0].suit != curr_pair[0].suit:
 					is_valid = false
 					break
-				
-				# 检查点数是否连续
-				if curr_pair[0].rank - prev_pair[0].rank != 1:
+
+				# 级别牌は連続に含めない
+				if prev_pair[0].rank == current_rank or curr_pair[0].rank == current_rank:
+					is_valid = false
+					break
+
+				if not _are_ranks_adjacent(prev_pair[0].rank, curr_pair[0].rank, current_rank, prev_pair[0].is_trump):
 					is_valid = false
 					break
 			

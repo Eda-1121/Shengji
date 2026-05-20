@@ -356,3 +356,12 @@ func clear_selection():
 		card.set_selected(false)
 	selected_cards.clear()
 	selection_changed.emit(0)
+
+func pre_select_cards(cards: Array[Card]):
+	"""埋底フェーズ用：複数カードを一括で選択状態にする"""
+	for card in cards:
+		if hand.has(card) and not card.is_selected:
+			card.set_selected(true)
+			selected_cards.append(card)
+			card.z_index = 1000 + selected_cards.size()
+	selection_changed.emit(selected_cards.size())

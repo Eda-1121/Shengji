@@ -23,10 +23,17 @@ var selected_count_label: Label
 # 玩家头像框
 var player_avatars: Array[Panel] = []
 var player_name_labels: Array[Label] = []
+var player_card_count_labels: Array[Label] = []
 
 # 新增：Phase 2 UI组件
 var bidding_ui: Node
 var game_over_ui: Node
+
+# 前トリック表示
+var last_trick_panel: Panel
+var last_trick_label: Label
+var last_trick_button: Button
+var last_trick_visible: bool = false
 
 # 信号
 signal play_cards_pressed
@@ -216,6 +223,35 @@ func create_ui():
 	center_message_panel.add_child(center_message)
 	
 	# =====================================
+	# 前トリック表示ボタン＆パネル
+	# =====================================
+	last_trick_button = Button.new()
+	last_trick_button.text = "前の手"
+	last_trick_button.position = Vector2(1090, 18)
+	last_trick_button.size = Vector2(172, 36)
+	last_trick_button.add_theme_font_size_override("font_size", 15)
+	style_button(last_trick_button)
+	last_trick_button.visible = false
+	last_trick_button.pressed.connect(_on_last_trick_button_pressed)
+	add_child(last_trick_button)
+
+	last_trick_panel = Panel.new()
+	last_trick_panel.position = Vector2(870, 62)
+	last_trick_panel.size = Vector2(392, 150)
+	last_trick_panel.visible = false
+	last_trick_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	style_panel(last_trick_panel, Color(0.02, 0.08, 0.06, 0.95))
+	add_child(last_trick_panel)
+
+	last_trick_label = Label.new()
+	last_trick_label.position = Vector2(10, 8)
+	last_trick_label.size = Vector2(372, 134)
+	last_trick_label.add_theme_font_size_override("font_size", 14)
+	last_trick_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	last_trick_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	last_trick_panel.add_child(last_trick_label)
+
+	# =====================================
 	# 玩家头像框
 	# =====================================
 	create_player_avatars()
@@ -223,7 +259,7 @@ func create_ui():
 func create_phase2_ui():
 	"""创建Phase 2的UI组件"""
 	# 叫牌UI
-	var BiddingUIScript = load("res://scripts/bidding_ui.gd")
+	var BiddingUIScript = load("res://scripts/shengji/bidding_ui.gd")
 	if BiddingUIScript:
 		bidding_ui = Control.new()
 		bidding_ui.name = "BiddingUI"
@@ -231,7 +267,7 @@ func create_phase2_ui():
 		add_child(bidding_ui)
 
 	# 游戏结束UI
-	var GameOverUIScript = load("res://scripts/game_over_ui.gd")
+	var GameOverUIScript = load("res://scripts/shengji/game_over_ui.gd")
 	if GameOverUIScript:
 		game_over_ui = Control.new()
 		game_over_ui.name = "GameOverUI"
@@ -274,14 +310,25 @@ func create_player_avatars():
 		player_name_labels.append(name_label)
 		
 		var status_label = Label.new()
-		status_label.position = Vector2(10, 35)
-		status_label.size = Vector2(116, 22)
+		status_label.position = Vector2(10, 33)
+		status_label.size = Vector2(66, 20)
 		status_label.text = "队伍%d" % [(i % 2) + 1]
-		status_label.add_theme_font_size_override("font_size", 14)
+		status_label.add_theme_font_size_override("font_size", 13)
 		status_label.add_theme_color_override("font_color", Color(0.3, 0.85, 0.35) if i % 2 == 0 else Color(0.95, 0.42, 0.42))
 		status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		avatar_panel.add_child(status_label)
+
+		var count_label = Label.new()
+		count_label.position = Vector2(76, 33)
+		count_label.size = Vector2(50, 20)
+		count_label.text = "🂠 --"
+		count_label.add_theme_font_size_override("font_size", 13)
+		count_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
+		count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		avatar_panel.add_child(count_label)
+		player_card_count_labels.append(count_label)
 
 # =====================================
 # 按钮回调
@@ -363,3 +410,25 @@ func update_selected_count(count: int, max_count: int = 8):
 			selected_count_label.add_theme_color_override("font_color", Color(0.8, 0.3, 0.3))
 		else:
 			selected_count_label.add_theme_color_override("font_color", Color.WHITE)
+
+func update_player_card_count(player_id: int, count: int):
+	if player_id < player_card_count_labels.size():
+		player_card_count_labels[player_id].text = "🂠 %d" % count
+
+func update_last_trick(summary: Array):
+	if summary.is_empty():
+		last_trick_button.visible = false
+		return
+	last_trick_button.visible = true
+	last_trick_visible = false
+	last_trick_panel.visible = false
+	var lines = []
+	for entry in summary:
+		var marker = "★ " if entry["is_winner"] else "  "
+		lines.append("%s%s: %s" % [marker, entry["player_name"], entry["cards_text"]])
+	last_trick_label.text = "\n".join(lines)
+
+func _on_last_trick_button_pressed():
+	last_trick_visible = not last_trick_visible
+	last_trick_panel.visible = last_trick_visible
+	last_trick_button.text = "閉じる" if last_trick_visible else "前の手"

@@ -7,9 +7,6 @@ var deck: Deck
 var players: Array[Player] = []
 var current_phase: GamePhase = GamePhase.DEALING_AND_BIDDING
 
-# 牌副数选择（2副或4副）
-var num_decks: int = 2
-
 var trump_suit: Card.Suit = Card.Suit.SPADE
 var current_level: int = 2
 var dealer_index: int = 0
@@ -17,8 +14,13 @@ var current_player_index: int = 0
 
 var bottom_cards: Array[Card] = []
 var current_trick: Array = []
+var last_trick_summary: Array = []  # [{player_name, cards_text, winner}]
 var team_scores: Array[int] = [0, 0]
 var team_levels: Array[int] = [2, 2]
+
+# 各プレイヤーの花色切れ追跡（-1 = トランプ切れ、Card.Suit値 = 非トランプ切れ）
+const VOID_TRUMP = -1
+var player_void_suits: Array = [[], [], [], []]
 
 # 叫牌相关
 var current_bid = {
@@ -61,7 +63,7 @@ func _ready():
 	initialize_game()
 
 func initialize_game():
-	print("=== 初始化游戏：使用 ", num_decks, " 副牌 ===")
+	print("=== 初始化游戏：使用 ", GameConfig.num_decks, " 副牌 ===")
 	# 玩家位置：玩家1在下方居中，其他AI玩家位置不变
 	var player_positions = [
 		Vector2(640, 558),   # 玩家1（人类）- 下方居中，给下方出牌按钮留出空间
@@ -128,7 +130,8 @@ func start_new_round():
 
 	# 重置游戏状态
 	cleanup_round_cards()
-	deck = Deck.new(num_decks)
+	player_void_suits = [[], [], [], []]
+	deck = Deck.new(GameConfig.num_decks)
 	deck.create_deck()
 	team_scores = [0, 0]
 	current_bid = {
@@ -207,9 +210,10 @@ func start_dealing_cards():
 
 		# 只有人类玩家的牌需要显示
 		if player.player_type == Player.PlayerType.HUMAN:
-			card.set_face_up(true, false)  # 人类玩家的牌正面朝上
+			card.set_face_up(true, false)
 			card.visible = true
 			player.set_card_selectable(false)
+			SoundManager.play_deal()
 		else:
 			# AI玩家的牌完全不显示（不需要看到背面）
 			card.visible = false
@@ -503,14 +507,13 @@ func can_make_bid(player: Player, suit: Card.Suit, count: int) -> bool:
 	return false
 
 func make_bid(player: Player, suit: Card.Suit, count: int):
-	"""执行叫牌"""
 	current_bid = {
 		"team": player.team,
 		"suit": suit,
 		"count": count,
 		"player_id": player.player_id
 	}
-	
+	SoundManager.play_bid()
 	var suit_name = get_suit_name(suit)
 
 	if ui_manager:
@@ -629,12 +632,17 @@ func start_burying_phase():
 
 	print("底牌发放完成，庄家手牌数：", dealer.hand.size())
 
+	# ヒント色を適用してからおすすめカードを自動選択
+	_apply_bury_hints(dealer)
+	var suggested = choose_ai_bury_cards(dealer)
+	dealer.pre_select_cards(suggested)
+
 	if ui_manager:
-		ui_manager.update_turn_message("庄家埋底 - 请选择8张牌作为底牌")
-		ui_manager.show_center_message("庄家请选择8张牌扣底", 2.0)
+		ui_manager.update_turn_message("埋底：赤=NG / 黄=得点牌 / 緑=安全 （変更できます）")
+		ui_manager.show_center_message("おすすめ8枚を選択しました（変更可）", 2.5)
 		ui_manager.show_bury_button(true)
-		ui_manager.set_bury_button_enabled(false)
-		ui_manager.update_selected_count(0, 8)
+		ui_manager.update_selected_count(dealer.selected_cards.size(), 8)
+		ui_manager.set_bury_button_enabled(dealer.selected_cards.size() == 8)
 
 func _on_bury_cards_pressed():
 	"""玩家点击埋底按钮"""
@@ -668,6 +676,7 @@ func _on_bury_cards_pressed():
 		card.visible = false
 
 	dealer.selected_cards.clear()
+	_clear_bury_hints(dealer)
 	dealer.update_hand_display()
 	dealer.set_card_selectable(false)
 
@@ -726,6 +735,38 @@ func ai_bury_bottom():
 	print("调用 auto_bury_for_player()")
 	await auto_bury_for_player(dealer)
 
+func _apply_bury_hints(dealer: Player):
+	for card in dealer.hand:
+		card.set_trump(trump_suit, current_level)
+		card.set_bury_hint(_get_bury_hint_level(card))
+
+func _get_bury_hint_level(card: Card) -> int:
+	if card.suit == Card.Suit.JOKER or card.rank == current_level or card.is_trump:
+		return 3  # 赤：絶対NG
+	if card.points > 0:
+		return 2  # 黄：得点牌・注意
+	return 1        # 緑：安全
+
+func _clear_bury_hints(dealer: Player):
+	for card in dealer.hand:
+		card.clear_bury_hint()
+
+func _apply_play_hints():
+	if players.is_empty():
+		return
+	var human = players[0]
+	if human.hand.is_empty():
+		return
+	var suggested = choose_ai_play(human)
+	for card in human.hand:
+		card.set_play_hint(suggested.has(card))
+
+func _clear_play_hints():
+	if players.is_empty():
+		return
+	for card in players[0].hand:
+		card.set_play_hint(false)
+
 func choose_ai_bury_cards(dealer: Player) -> Array:
 	var sorted_hand = dealer.hand.duplicate()
 	sorted_hand.sort_custom(func(a, b):
@@ -781,6 +822,7 @@ func start_playing_phase():
 		player.update_hand_display(true)
 
 	current_player_index = dealer_index
+	refresh_all_card_counts()
 	print("庄家（叫牌成功的玩家）：", players[dealer_index].player_name, " (player_id=", dealer_index, ")")
 	print("首先出牌的玩家：", players[current_player_index].player_name)
 
@@ -814,15 +856,27 @@ func get_team_name(team: int) -> String:
 func get_current_player() -> Player:
 	return players[current_player_index]
 
+func refresh_all_card_counts():
+	if ui_manager == null:
+		return
+	for player in players:
+		if player.player_type == Player.PlayerType.AI:
+			ui_manager.update_player_card_count(player.player_id, player.get_hand_size())
+
 func update_turn_interaction():
-	"""根据当前阶段和当前玩家启用人类玩家交互"""
 	var human_player = players[0]
 	var human_turn = current_phase == GamePhase.PLAYING and current_player_index == 0
 
 	for player in players:
 		player.set_card_selectable(player == human_player and human_turn)
 
+	refresh_all_card_counts()
 	update_action_controls()
+
+	if human_turn:
+		_apply_play_hints()
+	else:
+		_clear_play_hints()
 
 func on_human_selection_changed(_count: int):
 	"""人类玩家选牌变化后刷新操作按钮状态"""
@@ -878,6 +932,7 @@ func _on_play_cards_pressed():
 	"""出牌按钮被点击"""
 	if current_phase != GamePhase.PLAYING:
 		return
+	_clear_play_hints()
 
 	var human_player = players[0]
 	if current_player_index != human_player.player_id:
@@ -981,28 +1036,42 @@ func can_beat_card(card1: Card, card2: Card) -> bool:
 	"""检查card1是否能打过card2"""
 	return card1.compare_to(card2, trump_suit, current_level) > 0
 
+const CARD_ANIM_SOURCE = [
+	Vector2(640, 600),   # Player 1 (human)
+	Vector2(60,  300),   # Player 2 (AI left)
+	Vector2(640,  60),   # Player 3 (AI top)
+	Vector2(1220, 300),  # Player 4 (AI right)
+]
+
 func show_played_cards(player_id: int, cards: Array):
-	"""显示出的牌"""
 	var center_position = play_area_positions[player_id]
 	var spacing = get_played_card_spacing(cards.size())
 	var row_width = spacing * float(max(cards.size() - 1, 0))
 	var start_position = center_position - Vector2(row_width * 0.5, 0)
 
+	SoundManager.play_card_play()
+
 	for i in range(cards.size()):
 		var card = cards[i]
-		# 确保牌从原父节点移除并添加到game_manager
 		if card.get_parent():
 			card.get_parent().remove_child(card)
 		add_child(card)
 
-		# 以该玩家的牌池位置为中心，动态压缩间距，避免多张牌超出或不规整
-		card.global_position = start_position + Vector2(i * spacing, 0)
+		var target_pos = start_position + Vector2(i * spacing, 0)
 		card.z_index = 100 + i
 		card.visible = true
 		card.set_face_up(true, true)
-
-		# 禁用已出牌的交互事件
 		card.is_selectable = false
+
+		if player_id != 0:
+			# AI: アバター位置から出牌エリアへスライドアニメーション
+			card.position = CARD_ANIM_SOURCE[player_id]
+			var tween = card.create_tween()
+			tween.set_ease(Tween.EASE_OUT)
+			tween.set_trans(Tween.TRANS_CUBIC)
+			tween.tween_property(card, "position", target_pos, 0.30)
+		else:
+			card.global_position = target_pos
 
 func get_played_card_spacing(card_count: int) -> float:
 	if card_count <= 1:
@@ -1091,7 +1160,7 @@ func choose_ai_lead_play(ai_player: Player) -> Array:
 	var best_candidate = candidates[0]
 	var best_score = INF
 	for candidate in candidates:
-		var score = score_ai_lead_candidate(candidate)
+		var score = score_ai_lead_candidate(candidate, ai_player.player_id)
 		if score < best_score:
 			best_score = score
 			best_candidate = candidate
@@ -1327,7 +1396,7 @@ func build_pair_preferred_candidate(cards: Array[Card], needed: int) -> Array:
 
 	return result
 
-func score_ai_lead_candidate(cards: Array) -> float:
+func score_ai_lead_candidate(cards: Array, ai_player_id: int = 0) -> float:
 	var pattern = GameRules.identify_pattern(normalize_card_list(cards), trump_suit, current_level)
 	var score = get_ai_play_cost(cards)
 	score += float(GameRules.calculate_points(cards)) * 2.2
@@ -1343,6 +1412,14 @@ func score_ai_lead_candidate(cards: Array) -> float:
 			score -= 8.0
 		GameRules.CardPattern.TRACTOR:
 			score -= 16.0
+
+	# 相手がこの花色（またはトランプ）を切らしている場合はペナルティ
+	if not cards.is_empty() and cards[0] is Card:
+		var lead_c: Card = cards[0]
+		lead_c.set_trump(trump_suit, current_level)
+		var void_key = VOID_TRUMP if lead_c.is_trump else lead_c.suit
+		if _any_opponent_void(ai_player_id, void_key):
+			score += 22.0  # リスク増：相手が自由牌を出せる
 
 	return score
 
@@ -1447,6 +1524,7 @@ func evaluate_trick():
 
 	var winner = players[winner_play["player_id"]]
 	print("本轮赢家：", winner.player_name, " (player_id=", winner_play["player_id"], ")")
+	SoundManager.play_trick_win()
 
 	var points = 0
 	for play in current_trick:
@@ -1458,6 +1536,22 @@ func evaluate_trick():
 		ui_manager.update_team_scores(team_scores[0], team_scores[1])
 		ui_manager.show_center_message("%s 赢得本轮，得 %d 分" % [winner.player_name, points], 2.0)
 
+	# 底牌倍率とトリック情報はカード解放前に計算・保存する
+	_update_void_tracking()
+	var bottom_multiplier = calculate_bottom_multiplier(winner_play)
+
+	# 前トリック情報を保存（カード解放前）
+	last_trick_summary.clear()
+	for play in current_trick:
+		var cards_text = " ".join(play["cards"].map(func(c): return c.get_display_name()))
+		last_trick_summary.append({
+			"player_name": players[play["player_id"]].player_name,
+			"cards_text": cards_text,
+			"is_winner": play["player_id"] == winner_play["player_id"]
+		})
+	if ui_manager and ui_manager.has_method("update_last_trick"):
+		ui_manager.update_last_trick(last_trick_summary)
+
 	await get_tree().create_timer(2.0).timeout
 
 	for play in current_trick:
@@ -1466,24 +1560,23 @@ func evaluate_trick():
 				card.queue_free()
 
 	current_trick.clear()
-	
+
 	if players[0].get_hand_size() == 0:
 		await get_tree().create_timer(1.0).timeout
-		
-		var bottom_points = GameRules.calculate_points(bottom_cards)
-		var multiplier = 2
 
+		var bottom_points = GameRules.calculate_points(bottom_cards)
+		var multiplier = bottom_multiplier
 
 		if winner.team == current_bid["team"]:
 			team_scores[current_bid["team"]] += bottom_points * multiplier
 			if ui_manager:
-				ui_manager.show_center_message("庄家队扣底成功!+%d分" % [bottom_points * multiplier], 2.0)
+				ui_manager.show_center_message("庄家队扣底成功! +%d分 (x%d)" % [bottom_points * multiplier, multiplier], 2.0)
 				ui_manager.update_team_scores(team_scores[0], team_scores[1])
 		else:
 			var opponent_team = 1 - current_bid["team"]
 			team_scores[opponent_team] += bottom_points * multiplier
 			if ui_manager:
-				ui_manager.show_center_message("对手队抠底成功!+%d分" % [bottom_points * multiplier], 2.0)
+				ui_manager.show_center_message("对手队抠底成功! +%d分 (x%d)" % [bottom_points * multiplier, multiplier], 2.0)
 				ui_manager.update_team_scores(team_scores[0], team_scores[1])
 		
 		await get_tree().create_timer(2.0).timeout
@@ -1506,6 +1599,50 @@ func evaluate_trick():
 # 结束和升级
 # =====================================
 
+func _update_void_tracking():
+	if current_trick.size() < 2:
+		return
+	var lead_card = current_trick[0]["cards"][0]
+	lead_card.set_trump(trump_suit, current_level)
+	for i in range(1, current_trick.size()):
+		var play = current_trick[i]
+		var played_card = play["cards"][0]
+		played_card.set_trump(trump_suit, current_level)
+		var pid = play["player_id"]
+		if lead_card.is_trump:
+			if not played_card.is_trump and not player_void_suits[pid].has(VOID_TRUMP):
+				player_void_suits[pid].append(VOID_TRUMP)
+				print("▶ ", players[pid].player_name, " トランプ切れ確定")
+		else:
+			if (played_card.is_trump or played_card.suit != lead_card.suit) and not player_void_suits[pid].has(lead_card.suit):
+				player_void_suits[pid].append(lead_card.suit)
+				print("▶ ", players[pid].player_name, " ", lead_card.suit, " 切れ確定")
+
+func _any_opponent_void(ai_player_id: int, suit_key) -> bool:
+	for i in range(4):
+		if i != ai_player_id and players[i].team != players[ai_player_id].team:
+			if player_void_suits[i].has(suit_key):
+				return true
+	return false
+
+func calculate_bottom_multiplier(winning_play: Dictionary) -> int:
+	# 倍率ルール: ×2基本、小王対→×4、大王対→×8、両ジョーカー対→×16
+	var small_joker_count = 0
+	var big_joker_count = 0
+	for card in winning_play.get("cards", []):
+		if card.suit == Card.Suit.JOKER:
+			if card.rank == Card.Rank.BIG_JOKER:
+				big_joker_count += 1
+			else:
+				small_joker_count += 1
+	if big_joker_count >= 2 and small_joker_count >= 2:
+		return 16
+	if big_joker_count >= 2:
+		return 8
+	if small_joker_count >= 2:
+		return 4
+	return 2
+
 func end_round():
 	"""本局结束，计算升级"""
 	current_phase = GamePhase.SCORING
@@ -1521,47 +1658,52 @@ func end_round():
 	var levels_to_advance = 0
 	var winning_team = -1
 
-	# 标准升级规则（根据对手队得分）：
-	# 对手得分 < 40分：庄家升3级
-	# 对手得分 40-75分：庄家升2级
-	# 对手得分 80-115分：庄家升1级
-	# 对手得分 120-155分：对手升1级，庄家换到对手队
-	# 对手得分 160-195分：对手升2级，庄家换到对手队
-	# 对手得分 ≥ 200分：对手升3级，庄家换到对手队
+	# 标准升级规则（攻撃チームの得点による）:
+	# 攻撃チーム 0点       : 庄家チーム +3级
+	# 攻撃チーム 1〜39点   : 庄家チーム +2级
+	# 攻撃チーム 40〜79点  : 庄家チーム +1级
+	# 攻撃チーム 80〜119点 : 攻撃チーム +1级（攻撃勝利・庄家交代）
+	# 攻撃チーム 120〜159点: 攻撃チーム +2级
+	# 攻撃チーム 160〜199点: 攻撃チーム +3级
+	# 攻撃チーム 200点以上 : 攻撃チーム +4级
 
 	if attacker_score >= 200:
-		# 对手升3级
-		levels_to_advance = 3
+		levels_to_advance = 4
 		winning_team = attacker_team
 		team_levels[attacker_team] += levels_to_advance
-		dealer_index = (dealer_index + 1) % 4  # 庄家换到对手队
+		dealer_index = (dealer_index + 1) % 4
 		if ui_manager:
 			ui_manager.show_center_message("队伍%d 大胜！升%d级！" % [attacker_team + 1, levels_to_advance], 3.0)
 	elif attacker_score >= 160:
-		# 对手升2级
-		levels_to_advance = 2
+		levels_to_advance = 3
 		winning_team = attacker_team
 		team_levels[attacker_team] += levels_to_advance
 		dealer_index = (dealer_index + 1) % 4
 		if ui_manager:
 			ui_manager.show_center_message("队伍%d 获胜！升%d级！" % [attacker_team + 1, levels_to_advance], 3.0)
 	elif attacker_score >= 120:
-		# 对手升1级
-		levels_to_advance = 1
+		levels_to_advance = 2
 		winning_team = attacker_team
 		team_levels[attacker_team] += levels_to_advance
 		dealer_index = (dealer_index + 1) % 4
 		if ui_manager:
 			ui_manager.show_center_message("队伍%d 获胜！升%d级！" % [attacker_team + 1, levels_to_advance], 3.0)
 	elif attacker_score >= 80:
+		# 80点以上 = 攻撃チーム勝利・庄家交代（標準ルール）
+		levels_to_advance = 1
+		winning_team = attacker_team
+		team_levels[attacker_team] += levels_to_advance
+		dealer_index = (dealer_index + 1) % 4
+		if ui_manager:
+			ui_manager.show_center_message("队伍%d 获胜！升%d级！" % [attacker_team + 1, levels_to_advance], 3.0)
+	elif attacker_score >= 40:
 		# 庄家守住，升1级
 		levels_to_advance = 1
 		winning_team = dealer_team
 		team_levels[dealer_team] += levels_to_advance
-		# 庄家不变
 		if ui_manager:
 			ui_manager.show_center_message("队伍%d 守住！升%d级！" % [dealer_team + 1, levels_to_advance], 3.0)
-	elif attacker_score >= 40:
+	elif attacker_score >= 1:
 		# 庄家守住，升2级
 		levels_to_advance = 2
 		winning_team = dealer_team
@@ -1569,7 +1711,7 @@ func end_round():
 		if ui_manager:
 			ui_manager.show_center_message("队伍%d 守住！升%d级！" % [dealer_team + 1, levels_to_advance], 3.0)
 	else:
-		# 对手得分 < 40，庄家大胜，升3级
+		# 攻撃チーム0点 = 庄家チーム大勝、+3级
 		levels_to_advance = 3
 		winning_team = dealer_team
 		team_levels[dealer_team] += levels_to_advance
@@ -1578,14 +1720,14 @@ func end_round():
 
 	print("获胜队伍：队伍", winning_team + 1, " 升级：", levels_to_advance)
 	print("当前等级 - 队伍1：", team_levels[0], " 队伍2：", team_levels[1])
+	SoundManager.play_level_up()
 
-	# 下一局的当前级别取新庄家队伍的等级
 	current_level = team_levels[players[dealer_index].team]
-	
+
 	await get_tree().create_timer(3.0).timeout
-	
-	# 检查游戏是否结束
+
 	if check_game_over():
+		SoundManager.play_game_over()
 		show_game_over_screen()
 	else:
 		# 继续下一局

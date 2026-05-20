@@ -4,6 +4,7 @@ class_name GameOverUI
 
 signal restart_game
 signal quit_game
+signal go_to_title
 
 var panel: Panel
 var title_label: Label
@@ -11,6 +12,7 @@ var winner_label: Label
 var stats_label: Label
 var restart_button: Button
 var quit_button: Button
+var title_button: Button
 
 func _ready():
 	create_game_over_panel()
@@ -61,8 +63,8 @@ func create_game_over_panel():
 	
 	# 按钮容器
 	var button_container = HBoxContainer.new()
-	button_container.position = Vector2(150, 280)
-	button_container.add_theme_constant_override("separation", 40)
+	button_container.position = Vector2(60, 280)
+	button_container.add_theme_constant_override("separation", 20)
 	panel.add_child(button_container)
 	
 	# 重新开始按钮
@@ -73,6 +75,14 @@ func create_game_over_panel():
 	restart_button.pressed.connect(_on_restart_pressed)
 	button_container.add_child(restart_button)
 	
+	# タイトルへ戻るボタン
+	title_button = Button.new()
+	title_button.text = "タイトルへ"
+	title_button.custom_minimum_size = Vector2(140, 50)
+	title_button.add_theme_font_size_override("font_size", 24)
+	title_button.pressed.connect(_on_title_pressed)
+	button_container.add_child(title_button)
+
 	# 退出按钮
 	quit_button = Button.new()
 	quit_button.text = "退出游戏"
@@ -109,6 +119,10 @@ func hide_game_over():
 func _on_restart_pressed():
 	"""重新开始按钮"""
 	restart_game.emit()
+
+func _on_title_pressed():
+	SoundManager.play_card_click()
+	get_tree().change_scene_to_file("res://scenes/title.tscn")
 
 func _on_quit_pressed():
 	"""退出按钮"""
