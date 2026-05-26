@@ -49,9 +49,15 @@ func _build_ui():
 	add_child(panel)
 
 	# パネル背景
+	var ps = StyleBoxFlat.new()
+	ps.bg_color = Color(0.051, 0.106, 0.165)
+	ps.border_color = Color(0.941, 0.788, 0.416, 0.38)
+	ps.set_border_width_all(1)
+	ps.set_corner_radius_all(10)
+	panel.add_theme_stylebox_override("panel", ps) if panel is Panel else null
 	var pbg = ColorRect.new()
 	pbg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	pbg.color = Color(0.05, 0.08, 0.13)
+	pbg.color = Color(0.051, 0.106, 0.165)
 	pbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(pbg)
 
@@ -59,15 +65,15 @@ func _build_ui():
 	var hdr = ColorRect.new()
 	hdr.position = Vector2(0, 0)
 	hdr.size     = Vector2(PW, 52)
-	hdr.color    = Color(0.08, 0.14, 0.24)
+	hdr.color    = Color(0.035, 0.070, 0.110)
 	hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(hdr)
 
-	# ヘッダー左ライン
+	# ヘッダーゴールドライン
 	var accent = ColorRect.new()
 	accent.position = Vector2(0, 0)
 	accent.size     = Vector2(4, 52)
-	accent.color    = Color(0.35, 0.65, 1.00)
+	accent.color    = Color(0.941, 0.788, 0.416)
 	accent.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(accent)
 
@@ -92,7 +98,7 @@ func _build_ui():
 	var tab_bg = ColorRect.new()
 	tab_bg.position = Vector2(0, 52)
 	tab_bg.size     = Vector2(PW, 38)
-	tab_bg.color    = Color(0.07, 0.11, 0.18)
+	tab_bg.color    = Color(0.035, 0.070, 0.110)
 	tab_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(tab_bg)
 
@@ -110,8 +116,8 @@ func _build_ui():
 	# ヘッダー下の仕切り
 	var sep = ColorRect.new()
 	sep.position = Vector2(0, 90)
-	sep.size     = Vector2(PW, 2)
-	sep.color    = Color(0.25, 0.45, 0.75, 0.50)
+	sep.size     = Vector2(PW, 1)
+	sep.color    = Color(0.941, 0.788, 0.416, 0.30)
 	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(sep)
 
@@ -139,14 +145,14 @@ func _build_ui():
 
 	# パネル外枠
 	for r in [
-		[Vector2(0,    0),      Vector2(PW,  2)],
-		[Vector2(0,    PH - 2), Vector2(PW,  2)],
-		[Vector2(0,    0),      Vector2(2,   PH)],
-		[Vector2(PW-2, 0),      Vector2(2,   PH)],
+		[Vector2(0,    0),      Vector2(PW,  1)],
+		[Vector2(0,    PH - 1), Vector2(PW,  1)],
+		[Vector2(0,    0),      Vector2(1,   PH)],
+		[Vector2(PW-1, 0),      Vector2(1,   PH)],
 	]:
 		var b = ColorRect.new()
 		b.position = r[0]; b.size = r[1]
-		b.color = Color(0.30, 0.52, 0.80, 0.60)
+		b.color = Color(0.941, 0.788, 0.416, 0.35)
 		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_child(b)
 
@@ -160,23 +166,23 @@ func _switch_section(idx: int):
 	for i in _section_btns.size():
 		var s = StyleBoxFlat.new()
 		var active = (i == idx)
-		s.bg_color     = Color(0.14, 0.28, 0.52) if active else Color(0.07, 0.11, 0.18)
-		s.border_color = Color(0.40, 0.65, 1.00, 0.80) if active else Color(0.18, 0.30, 0.48, 0.50)
+		s.bg_color     = Color(0.08, 0.14, 0.10, 0.90) if active else Color(0.035, 0.070, 0.110)
+		s.border_color = Color(0.941, 0.788, 0.416, 0.80) if active else Color(0.941, 0.788, 0.416, 0.18)
 		s.set_border_width_all(0)
 		s.border_width_bottom = 3 if active else 1
 		s.set_corner_radius_all(0)
 		_section_btns[i].add_theme_stylebox_override("normal", s)
 		_section_btns[i].add_theme_stylebox_override("hover",  s if active else _hover_style())
-		var fc = Color(1.0, 0.92, 0.38) if active else Color(0.75, 0.85, 0.95)
+		var fc = Color(1.0, 0.92, 0.38) if active else Color(0.75, 0.87, 1.00)
 		_section_btns[i].add_theme_color_override("font_color", fc)
 	_rich.text = _get_content(idx)
 	_scroll.scroll_vertical = 0
 
 func _hover_style() -> StyleBoxFlat:
 	var s = StyleBoxFlat.new()
-	s.bg_color = Color(0.11, 0.18, 0.30)
+	s.bg_color = Color(0.05, 0.10, 0.16)
 	s.border_width_bottom = 1
-	s.border_color = Color(0.35, 0.55, 0.80, 0.40)
+	s.border_color = Color(0.941, 0.788, 0.416, 0.30)
 	return s
 
 # ================================================================

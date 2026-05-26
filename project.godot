@@ -19,22 +19,21 @@ run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[autoload]
+
+GameConfig="*res://scripts/game_config.gd"
+SoundManager="*res://scripts/sound_manager.gd"
+
 [display]
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
-window/size/resizable=true
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
 [dotnet]
 
 project/assembly_name="世界のカードゲーム"
-
-[autoload]
-
-GameConfig="*res://scripts/game_config.gd"
-SoundManager="*res://scripts/sound_manager.gd"
 
 [rendering]
 

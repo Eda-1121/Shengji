@@ -9,9 +9,9 @@ func _ready():
 	get_window().title = "升级 - 拖拉机 (Phase 2)"
 	get_window().size = Vector2i(1280, 720)
 	
-	# 添加全屏绿色背景
+	# 背景
 	var background = ColorRect.new()
-	background.color = Color(0.05, 0.37, 0.14)
+	background.color = Color(0.035, 0.080, 0.055)
 	background.position = Vector2.ZERO
 	background.size = Vector2(1280, 720)
 	background.z_index = -10

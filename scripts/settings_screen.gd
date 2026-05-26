@@ -17,34 +17,22 @@ func _ready():
 func _build_ui():
 	var bg = ColorRect.new()
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.color = Color(0, 0, 0, 0.65)
+	bg.color = Color(0, 0, 0, 0.70)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
 	var vp = get_viewport_rect().size
-	var panel = Control.new()
+	var panel = Panel.new()
 	panel.position = Vector2(int((vp.x - 500) / 2), int((vp.y - 340) / 2))
 	panel.size = Vector2(500, 340)
+
+	var ps = StyleBoxFlat.new()
+	ps.bg_color = Color(0.051, 0.106, 0.165)
+	ps.border_color = Color(0.941, 0.788, 0.416, 0.45)
+	ps.set_border_width_all(1)
+	ps.set_corner_radius_all(12)
+	panel.add_theme_stylebox_override("panel", ps)
 	add_child(panel)
-
-	var panel_bg = ColorRect.new()
-	panel_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	panel_bg.color = Color(0.05, 0.16, 0.07)
-	panel_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(panel_bg)
-
-	for rect in [
-		[Vector2(0,   0),   Vector2(500, 2)],
-		[Vector2(0,   338), Vector2(500, 2)],
-		[Vector2(0,   0),   Vector2(2,   340)],
-		[Vector2(498, 0),   Vector2(2,   340)],
-	]:
-		var border = ColorRect.new()
-		border.position = rect[0]
-		border.size     = rect[1]
-		border.color    = Color(0.4, 0.7, 0.4, 0.55)
-		border.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(border)
 
 	var title = Label.new()
 	title.text = "設　定"
@@ -90,7 +78,7 @@ func _add_separator(parent: Control, y: int):
 	var sep = ColorRect.new()
 	sep.position = Vector2(50, y)
 	sep.size = Vector2(400, 1)
-	sep.color = Color(0.4, 0.7, 0.4, 0.35)
+	sep.color = Color(0.941, 0.788, 0.416, 0.25)
 	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(sep)
 
@@ -100,7 +88,7 @@ func _add_row_label(parent: Control, text: String, y: int):
 	lbl.position = Vector2(50, y)
 	lbl.size = Vector2(400, 30)
 	lbl.add_theme_font_size_override("font_size", 20)
-	lbl.add_theme_color_override("font_color", Color(0.75, 0.92, 0.75))
+	lbl.add_theme_color_override("font_color", Color(0.75, 0.87, 1.00))
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(lbl)
 
@@ -113,21 +101,27 @@ func _make_button(text: String, pos: Vector2) -> Button:
 	return btn
 
 func _set_button_active(btn: Button, active: bool):
-	var mk = func(color: Color) -> StyleBoxFlat:
+	var acc = Color(0.941, 0.788, 0.416)
+	var mk = func(bg: Color, border_a: float) -> StyleBoxFlat:
 		var s = StyleBoxFlat.new()
-		s.bg_color = color
-		s.border_color = Color(0.55, 0.80, 0.45, 0.75) if active else Color(0.35, 0.55, 0.35, 0.45)
+		s.bg_color = bg
+		s.border_color = Color(acc.r, acc.g, acc.b, border_a)
 		s.set_border_width_all(1)
-		s.set_corner_radius_all(6)
+		s.set_corner_radius_all(8)
 		s.content_margin_left  = 8
 		s.content_margin_right = 8
 		return s
 
-	var base_color = Color(0.16, 0.48, 0.20) if active else Color(0.09, 0.24, 0.12)
-	btn.add_theme_stylebox_override("normal",  mk.call(base_color))
-	btn.add_theme_stylebox_override("hover",   mk.call(base_color.lightened(0.15)))
-	btn.add_theme_stylebox_override("pressed", mk.call(base_color.darkened(0.10)))
-	btn.add_theme_color_override("font_color", Color(1.0, 1.0, 0.85) if active else Color(0.70, 0.85, 0.70))
+	if active:
+		btn.add_theme_stylebox_override("normal",  mk.call(acc, 1.0))
+		btn.add_theme_stylebox_override("hover",   mk.call(acc.lightened(0.15), 1.0))
+		btn.add_theme_stylebox_override("pressed", mk.call(acc.darkened(0.12), 1.0))
+		btn.add_theme_color_override("font_color", Color(0.08, 0.06, 0.02))
+	else:
+		btn.add_theme_stylebox_override("normal",  mk.call(Color(0.06, 0.10, 0.16), 0.35))
+		btn.add_theme_stylebox_override("hover",   mk.call(Color(0.09, 0.14, 0.22), 0.50))
+		btn.add_theme_stylebox_override("pressed", mk.call(Color(0.04, 0.07, 0.11), 0.25))
+		btn.add_theme_color_override("font_color", Color(0.941, 0.788, 0.416, 0.70))
 
 func _update_sound_buttons():
 	_set_button_active(_sound_btn_on,  GameConfig.sound_enabled)

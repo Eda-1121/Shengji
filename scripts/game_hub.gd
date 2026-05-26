@@ -1,4 +1,4 @@
-# game_hub.gd - ゲーム選択ハブ（レスポンシブレイアウト）
+# game_hub.gd - ゲーム選択ハブ（モダンカードUI）
 extends Control
 
 const GAMES = [
@@ -6,12 +6,12 @@ const GAMES = [
 		"name": "升级 / 拖拉機",
 		"name_sub": "Shengji · 昇級",
 		"desc": "4人・2チーム制\n中国式トリックテイキング",
-		"icon": "♠♥♣♦",
-		"bg":    Color(0.05, 0.18, 0.08),
-		"accent": Color(1.00, 0.88, 0.28),
-		"scene": "res://scenes/shengji/main.tscn",
+		"icon": "♠♥",
+		"bg":     Color(0.102, 0.173, 0.102),
+		"accent": Color(0.941, 0.788, 0.416),
+		"scene":  "res://scenes/shengji/main.tscn",
 		"available": true,
-		"has_help": true,
+		"has_help":  true,
 		"deck_options": [2, 4],
 	},
 	{
@@ -19,9 +19,10 @@ const GAMES = [
 		"name_sub": "ハーツ",
 		"desc": "4人・個人戦\nハートと♠Qを避けろ",
 		"icon": "♥",
-		"bg":    Color(0.18, 0.04, 0.04),
-		"accent": Color(1.00, 0.52, 0.52),
-		"scene": "",
+		"mini_cards": "♥  ♠Q  ♥",
+		"bg":     Color(0.086, 0.129, 0.196),
+		"accent": Color(0.878, 0.353, 0.431),
+		"scene":  "",
 		"available": false,
 	},
 	{
@@ -29,40 +30,39 @@ const GAMES = [
 		"name_sub": "ブリッジ",
 		"desc": "4人・2チーム制\nビッドしてトリックを取れ",
 		"icon": "♠♣",
-		"bg":    Color(0.04, 0.07, 0.20),
-		"accent": Color(0.55, 0.72, 1.00),
-		"scene": "",
+		"mini_cards": "1♠  2♣  3NT",
+		"bg":     Color(0.086, 0.129, 0.196),
+		"accent": Color(0.353, 0.553, 0.878),
+		"scene":  "",
 		"available": false,
 	},
 	{
 		"name": "Poker",
 		"name_sub": "テキサスホールデム",
 		"desc": "2〜9人・個人戦\nブラフと戦略で勝利",
-		"icon": "🂠",
-		"bg":    Color(0.16, 0.10, 0.03),
-		"accent": Color(1.00, 0.80, 0.36),
-		"scene": "",
+		"icon": "♦",
+		"mini_cards": "A♦  K♠  Q♥",
+		"bg":     Color(0.086, 0.129, 0.196),
+		"accent": Color(0.690, 0.478, 0.243),
+		"scene":  "",
 		"available": false,
 	},
 ]
 
-# ---- スクリーン計算値（_ready で設定） ----
-var _sw: float   # 画面幅
-var _sh: float   # 画面高さ
-var _pw: int     # パネル幅
-var _ph: int     # パネル高さ
-var _py: int     # パネル Y 開始位置
-var _gap: int    # パネル間ギャップ
-var _pws: float  # パネル幅スケール（pw / 272）
-var _phs: float  # パネル高さスケール（ph / 452）
+var _sw: float
+var _sh: float
+var _pw: int
+var _ph: int
+var _py: int
+var _gap: int
+var _pws: float
+var _phs: float
 
-# y 座標をパネル高さ比でスケール
 func _sy(y: float) -> int:
 	return int(y * _phs)
 
-# フォントサイズをパネル幅比でスケール（最低 10pt）
 func _sf(s: float) -> int:
-	return max(10, int(s * _pws))
+	return max(9, int(s * _pws))
 
 func _ready():
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -72,45 +72,34 @@ func _ready():
 	_sw = vp.x
 	_sh = vp.y
 
-	# ギャップを画面幅の 1.5% に固定し、残りをパネル4枚で等分
-	_gap = max(16, int(_sw * 0.015))
+	_gap = max(12, int(_sw * 0.012))
 	_pw  = int((_sw - _gap * 5) / 4)
-	# パネル高さ：画面高さの 62% を基本にパネル幅比でキャップ
-	_ph  = max(420, min(int(_sh * 0.62), int(_pw * 1.65)))
-	# パネル開始 Y：ヘッダー下に余白を確保
-	_py  = max(148, int(_sh * 0.19))
-	_pws = _pw / 272.0
-	_phs = _ph / 452.0
+	_ph  = max(280, min(int(_sh * 0.42), int(_pw * 1.15), 420))
+	_py  = max(152, int(_sh * 0.22))
+	_pws = _pw / 300.0
+	_phs = _ph / 320.0
 
 	_build_bg()
 	_build_header()
+	_build_score_bar()
 	_build_game_panels()
 	_build_footer()
-
-# ---- 背景 ----
 
 func _build_bg():
 	var bg = ColorRect.new()
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.color = Color(0.03, 0.06, 0.12)
+	bg.color = Color(0.051, 0.106, 0.165)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
-	for y in [0.0, _sh - 4]:
-		var line = ColorRect.new()
-		line.position = Vector2(0, y)
-		line.size     = Vector2(_sw, 4)
-		line.color    = Color(0.3, 0.5, 0.8, 0.4)
-		add_child(line)
-
-# ---- ヘッダー ----
 
 func _build_header():
-	var hs = _sh / 720.0  # 縦スケール（720px 基準）
+	var hs = _sh / 720.0
 
 	var title = Label.new()
 	title.text = "世界のカードゲーム"
-	title.position = Vector2(0, int(18 * hs))
-	title.size = Vector2(_sw, int(70 * hs))
-	title.add_theme_font_size_override("font_size", max(40, int(56 * hs)))
+	title.position = Vector2(0, int(14 * hs))
+	title.size = Vector2(_sw, int(40 * hs))
+	title.add_theme_font_size_override("font_size", max(22, int(30 * hs)))
 	title.add_theme_color_override("font_color", Color(1.0, 0.92, 0.38))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -118,261 +107,294 @@ func _build_header():
 
 	var sub = Label.new()
 	sub.text = "World Card Games"
-	sub.position = Vector2(0, int(92 * hs))
-	sub.size = Vector2(_sw, int(30 * hs))
-	sub.add_theme_font_size_override("font_size", max(16, int(22 * hs)))
-	sub.add_theme_color_override("font_color", Color(0.60, 0.74, 0.90))
+	sub.position = Vector2(0, int(56 * hs))
+	sub.size = Vector2(_sw, int(22 * hs))
+	sub.add_theme_font_size_override("font_size", max(11, int(13 * hs)))
+	sub.add_theme_color_override("font_color", Color(0.60, 0.74, 0.90, 0.65))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(sub)
 
-	var sep_w = int(_sw * 0.667)
-	var sep = ColorRect.new()
-	sep.position = Vector2((_sw - sep_w) / 2, int(130 * hs))
-	sep.size     = Vector2(sep_w, 1)
-	sep.color    = Color(0.35, 0.50, 0.75, 0.45)
-	add_child(sep)
+	var div_w = 60
+	var div = ColorRect.new()
+	div.size = Vector2(div_w, 2)
+	div.position = Vector2(int((_sw - div_w) / 2), int(82 * hs))
+	div.color = Color(0.941, 0.788, 0.416, 0.75)
+	div.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(div)
 
-# ---- ゲームパネル ----
+func _build_score_bar():
+	var hs = _sh / 720.0
+	var total_plays = GameConfig.total_plays
+	var wins_count  = GameConfig.wins
+	var win_rate_str: String = "—"
+	if total_plays > 0:
+		win_rate_str = "%d%%" % int(float(wins_count) / float(total_plays) * 100)
+
+	var items = [
+		[str(total_plays), "総プレイ"],
+		[str(wins_count),  "勝利"],
+		[win_rate_str,     "勝率"],
+	]
+
+	var bar_w   = int(_sw * 0.32)
+	var bx      = int((_sw - bar_w) / 2)
+	var by      = int(96 * hs)
+	var item_w  = int(bar_w / 3)
+
+	for k in items.size():
+		var val_lbl = Label.new()
+		val_lbl.text = items[k][0]
+		val_lbl.position = Vector2(bx + k * item_w, by)
+		val_lbl.size = Vector2(item_w, int(22 * hs))
+		val_lbl.add_theme_font_size_override("font_size", max(13, int(16 * hs)))
+		val_lbl.add_theme_color_override("font_color", Color(1.0, 0.92, 0.38))
+		val_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		val_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(val_lbl)
+
+		var key_lbl = Label.new()
+		key_lbl.text = items[k][1]
+		key_lbl.position = Vector2(bx + k * item_w, by + int(22 * hs))
+		key_lbl.size = Vector2(item_w, int(16 * hs))
+		key_lbl.add_theme_font_size_override("font_size", max(9, int(11 * hs)))
+		key_lbl.add_theme_color_override("font_color", Color(0.60, 0.74, 0.90, 0.55))
+		key_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		key_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(key_lbl)
 
 func _build_game_panels():
 	for i in GAMES.size():
-		var g = GAMES[i]
+		var g  = GAMES[i]
 		var px = _gap + i * (_pw + _gap)
 		_build_panel(g, px)
 
 func _build_panel(g: Dictionary, px: float):
-	var panel = Control.new()
+	var panel = Panel.new()
 	panel.position = Vector2(px, _py)
-	panel.size     = Vector2(_pw, _ph)
+	panel.size = Vector2(_pw, _ph)
+	panel.clip_contents = true
+
+	var ps = StyleBoxFlat.new()
+	ps.bg_color = g["bg"]
+	ps.set_corner_radius_all(12)
+	ps.border_color = Color(g["accent"], 0.45 if g["available"] else 0.18)
+	ps.set_border_width_all(1)
+	panel.add_theme_stylebox_override("panel", ps)
+
+	if not g["available"]:
+		panel.modulate = Color(1, 1, 1, 0.75)
+
 	add_child(panel)
 
-	var bg = ColorRect.new()
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.color = g["bg"]
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(bg)
-
-	# アクセントボーダー
-	var border_color = g["accent"] if g["available"] else Color(g["accent"], 0.35)
-	for rect in [
-		[Vector2(0,        0),          Vector2(_pw,  3)],
-		[Vector2(0,        _ph - 3),    Vector2(_pw,  3)],
-		[Vector2(0,        0),          Vector2(3,    _ph)],
-		[Vector2(_pw - 3,  0),          Vector2(3,    _ph)],
-	]:
-		var b = ColorRect.new()
-		b.position = rect[0]
-		b.size     = rect[1]
-		b.color    = border_color
-		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(b)
-
-	# スートアイコン（背景装飾）
-	var deco = Label.new()
-	deco.text = g["icon"]
-	deco.position = Vector2(0, _sy(32))
-	deco.size = Vector2(_pw, _sy(108))
-	deco.add_theme_font_size_override("font_size", _sf(72))
-	var dc = g["accent"]
-	deco.add_theme_color_override("font_color", Color(dc.r, dc.g, dc.b, 0.18 if g["available"] else 0.10))
-	deco.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(deco)
+	# スートアイコン
+	var gc = g["accent"]
+	var icon_lbl = Label.new()
+	icon_lbl.text = g["icon"]
+	icon_lbl.position = Vector2(int(12 * _pws), _sy(10))
+	icon_lbl.size = Vector2(_pw - int(24 * _pws), _sy(36))
+	icon_lbl.add_theme_font_size_override("font_size", _sf(18))
+	icon_lbl.add_theme_color_override("font_color", Color(gc.r, gc.g, gc.b, 0.85 if g["available"] else 0.40))
+	icon_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	icon_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(icon_lbl)
 
 	# ゲーム名
 	var name_lbl = Label.new()
 	name_lbl.text = g["name"]
-	name_lbl.position = Vector2(8, _sy(128))
-	name_lbl.size = Vector2(_pw - 16, _sy(44))
-	name_lbl.add_theme_font_size_override("font_size", _sf(26))
-	name_lbl.add_theme_color_override("font_color", g["accent"] if g["available"] else Color(g["accent"], 0.50))
-	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_lbl.position = Vector2(int(12 * _pws), _sy(52))
+	name_lbl.size = Vector2(_pw - int(24 * _pws), _sy(26))
+	name_lbl.add_theme_font_size_override("font_size", _sf(15))
+	name_lbl.add_theme_color_override("font_color", Color(1, 1, 1) if g["available"] else Color(0.85, 0.85, 0.85, 0.65))
 	name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(name_lbl)
 
 	# サブタイトル
 	var sub_lbl = Label.new()
 	sub_lbl.text = g["name_sub"]
-	sub_lbl.position = Vector2(8, _sy(172))
-	sub_lbl.size = Vector2(_pw - 16, _sy(28))
-	sub_lbl.add_theme_font_size_override("font_size", _sf(16))
-	sub_lbl.add_theme_color_override("font_color", Color(0.7, 0.8, 0.7, 0.8) if g["available"] else Color(0.5, 0.5, 0.5, 0.6))
-	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sub_lbl.position = Vector2(int(12 * _pws), _sy(78))
+	sub_lbl.size = Vector2(_pw - int(24 * _pws), _sy(18))
+	sub_lbl.add_theme_font_size_override("font_size", _sf(11))
+	sub_lbl.add_theme_color_override("font_color", Color(0.70, 0.80, 0.70, 0.70) if g["available"] else Color(0.55, 0.55, 0.55, 0.50))
 	sub_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(sub_lbl)
 
-	var sep1 = ColorRect.new()
-	sep1.position = Vector2(int(24 * _pws), _sy(208))
-	sep1.size     = Vector2(_pw - int(48 * _pws), 1)
-	sep1.color    = Color(g["accent"], 0.25) if g["available"] else Color(0.4, 0.4, 0.4, 0.25)
-	sep1.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(sep1)
+	var sep = ColorRect.new()
+	sep.position = Vector2(int(12 * _pws), _sy(102))
+	sep.size = Vector2(_pw - int(24 * _pws), 1)
+	sep.color = Color(gc.r, gc.g, gc.b, 0.20 if g["available"] else 0.10)
+	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(sep)
 
 	# 説明文
 	var desc_lbl = Label.new()
 	desc_lbl.text = g["desc"]
-	desc_lbl.position = Vector2(8, _sy(217))
-	desc_lbl.size = Vector2(_pw - 16, _sy(74))
-	desc_lbl.add_theme_font_size_override("font_size", _sf(16))
-	desc_lbl.add_theme_color_override("font_color", Color(0.75, 0.85, 0.75) if g["available"] else Color(0.45, 0.45, 0.45))
-	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc_lbl.position = Vector2(int(12 * _pws), _sy(110))
+	desc_lbl.size = Vector2(_pw - int(24 * _pws), _sy(56))
+	desc_lbl.add_theme_font_size_override("font_size", _sf(11))
+	desc_lbl.add_theme_color_override("font_color", Color(0.75, 0.85, 0.75, 0.80) if g["available"] else Color(0.50, 0.50, 0.50, 0.55))
 	desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(desc_lbl)
 
-	# デッキ数選択（対応ゲームのみ）
-	if g.has("deck_options") and g["available"]:
-		var deck_sep = ColorRect.new()
-		deck_sep.position = Vector2(int(24 * _pws), _sy(298))
-		deck_sep.size     = Vector2(_pw - int(48 * _pws), 1)
-		deck_sep.color    = Color(g["accent"], 0.20)
-		deck_sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(deck_sep)
-
-		var dlbl = Label.new()
-		dlbl.text = "デッキ数"
-		dlbl.position = Vector2(int(24 * _pws), _sy(304))
-		dlbl.size = Vector2(int(76 * _pws), _sy(24))
-		dlbl.add_theme_font_size_override("font_size", _sf(13))
-		dlbl.add_theme_color_override("font_color", Color(0.65, 0.80, 0.65))
-		dlbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(dlbl)
-
-		var deck_opts: Array = g["deck_options"]
-		var deck_btns: Array = []
-		var dbw = int(56 * _pws)
-		var dbh = _sy(26)
-		var dbx = int(110 * _pws)
-		for val in deck_opts:
-			var db = Button.new()
-			db.text = "×%d" % val
-			db.position = Vector2(dbx, _sy(302))
-			db.size = Vector2(dbw, dbh)
-			db.add_theme_font_size_override("font_size", _sf(13))
-			panel.add_child(db)
-			deck_btns.append(db)
-			dbx += dbw + int(6 * _pws)
-
-		var acc = g["accent"]
-		var refresh_deck = func():
-			for k in deck_btns.size():
-				var act = GameConfig.num_decks == deck_opts[k]
-				var sn = StyleBoxFlat.new()
-				sn.bg_color     = Color(0.13, 0.26, 0.10) if act else Color(0.05, 0.09, 0.05)
-				sn.border_color = Color(acc, 0.85 if act else 0.28)
-				sn.set_border_width_all(1)
-				sn.set_corner_radius_all(4)
-				deck_btns[k].add_theme_stylebox_override("normal", sn)
-				var snh = sn.duplicate()
-				snh.bg_color = sn.bg_color.lightened(0.10)
-				deck_btns[k].add_theme_stylebox_override("hover", snh)
-				deck_btns[k].add_theme_color_override("font_color",
-					Color(acc, 1.0) if act else Color(0.55, 0.70, 0.55))
-
-		for k in deck_btns.size():
-			var opt_val = deck_opts[k]
-			deck_btns[k].pressed.connect(func():
-				SoundManager.play_card_click()
-				GameConfig.num_decks = opt_val
-				refresh_deck.call()
-			)
-		refresh_deck.call()
-
-	var mk_style = func(col: Color) -> StyleBoxFlat:
-		var s = StyleBoxFlat.new()
-		s.bg_color = col
-		s.border_color = g["accent"] if g["available"] else Color(0.4, 0.4, 0.4)
-		s.set_border_width_all(1)
-		s.set_corner_radius_all(6)
-		s.content_margin_left  = 8
-		s.content_margin_right = 8
-		return s
-
-	# プレイ / 準備中ボタン
-	var btn_h   = _sy(44)
-	var help_h  = _sy(32)
-	var help_gap = _sy(16)
-	var bottom_pad = _sy(20)
-	var btn_y   = _ph - bottom_pad - help_h - help_gap - btn_h
-
-	var btn = Button.new()
-	btn.position = Vector2(int(24 * _pws), btn_y)
-	btn.size     = Vector2(_pw - int(48 * _pws), btn_h)
-	btn.add_theme_font_size_override("font_size", _sf(20))
+	var bottom_pad = _sy(12)
+	var link_h     = _sy(16)
+	var link_gap   = _sy(8)
+	var btn_h      = _sy(36)
 
 	if g["available"]:
-		btn.text = "プレイ"
-		btn.add_theme_color_override("font_color", Color(0.08, 0.08, 0.08))
-		var btn_col = g["accent"]
-		btn.add_theme_stylebox_override("normal",  mk_style.call(btn_col))
-		btn.add_theme_stylebox_override("hover",   mk_style.call(btn_col.lightened(0.18)))
-		btn.add_theme_stylebox_override("pressed", mk_style.call(btn_col.darkened(0.14)))
+		if g.has("deck_options"):
+			_build_deck_selector(panel, g)
+
+		var btn_y: int
+		if g.get("has_help", false):
+			btn_y = _ph - bottom_pad - link_h - link_gap - btn_h
+		else:
+			btn_y = _ph - bottom_pad - btn_h
+
+		var play_btn = Button.new()
+		play_btn.text = "▶  プレイ"
+		play_btn.position = Vector2(int(12 * _pws), btn_y)
+		play_btn.size = Vector2(_pw - int(24 * _pws), btn_h)
+		play_btn.add_theme_font_size_override("font_size", _sf(15))
+		play_btn.add_theme_color_override("font_color", Color(0.08, 0.06, 0.02))
+		var acc = g["accent"]
+		var mk_play = func(col: Color) -> StyleBoxFlat:
+			var s = StyleBoxFlat.new()
+			s.bg_color = col
+			s.set_corner_radius_all(8)
+			s.set_border_width_all(0)
+			s.content_margin_left  = 6
+			s.content_margin_right = 6
+			return s
+		play_btn.add_theme_stylebox_override("normal",  mk_play.call(acc))
+		play_btn.add_theme_stylebox_override("hover",   mk_play.call(acc.lightened(0.15)))
+		play_btn.add_theme_stylebox_override("pressed", mk_play.call(acc.darkened(0.12)))
 		var scene_path = g["scene"]
-		btn.pressed.connect(func(): _on_play_pressed(scene_path))
+		play_btn.pressed.connect(func(): _on_play_pressed(scene_path))
+		panel.add_child(play_btn)
+
+		if g.get("has_help", false):
+			var help_btn = Button.new()
+			help_btn.text = "遊び方・ルール"
+			help_btn.position = Vector2(int(12 * _pws), _ph - bottom_pad - link_h)
+			help_btn.size = Vector2(_pw - int(24 * _pws), link_h)
+			help_btn.add_theme_font_size_override("font_size", _sf(11))
+			help_btn.add_theme_color_override("font_color", Color(0.55, 0.78, 1.0, 0.75))
+			var ts = StyleBoxEmpty.new()
+			help_btn.add_theme_stylebox_override("normal",  ts)
+			help_btn.add_theme_stylebox_override("hover",   ts)
+			help_btn.add_theme_stylebox_override("pressed", ts)
+			help_btn.alignment = HORIZONTAL_ALIGNMENT_CENTER
+			help_btn.pressed.connect(_on_help_pressed)
+			panel.add_child(help_btn)
 	else:
-		btn.text = "準備中"
-		btn.disabled = true
-		btn.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45))
-		btn.add_theme_stylebox_override("disabled", mk_style.call(Color(0.10, 0.10, 0.14)))
-		btn.add_theme_stylebox_override("normal",   mk_style.call(Color(0.10, 0.10, 0.14)))
+		if g.has("mini_cards"):
+			var mc = Label.new()
+			mc.text = g["mini_cards"]
+			mc.position = Vector2(int(12 * _pws), _sy(174))
+			mc.size = Vector2(_pw - int(24 * _pws), _sy(28))
+			mc.add_theme_font_size_override("font_size", _sf(13))
+			mc.add_theme_color_override("font_color", Color(gc.r, gc.g, gc.b, 0.50))
+			mc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			mc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			panel.add_child(mc)
 
-	panel.add_child(btn)
+		var badge_w = int(82 * _pws)
+		var badge_h = _sy(22)
+		var badge = Button.new()
+		badge.text = "準備中"
+		badge.position = Vector2(int((_pw - badge_w) / 2), _ph - bottom_pad - badge_h)
+		badge.size = Vector2(badge_w, badge_h)
+		badge.disabled = true
+		badge.add_theme_font_size_override("font_size", _sf(11))
+		badge.add_theme_color_override("font_color", Color(gc.r, gc.g, gc.b, 0.65))
+		var bs = StyleBoxFlat.new()
+		bs.bg_color     = Color(0, 0, 0, 0)
+		bs.border_color = Color(gc.r, gc.g, gc.b, 0.38)
+		bs.set_border_width_all(1)
+		bs.set_corner_radius_all(11)
+		badge.add_theme_stylebox_override("normal",   bs)
+		badge.add_theme_stylebox_override("disabled", bs)
+		panel.add_child(badge)
 
-	# 遊び方ボタン（ヘルプがあるゲームのみ）
-	if g.get("has_help", false):
-		var help_btn = Button.new()
-		help_btn.text = "📖  遊び方・ルール"
-		help_btn.position = Vector2(int(24 * _pws), _ph - bottom_pad - help_h)
-		help_btn.size     = Vector2(_pw - int(48 * _pws), help_h)
-		help_btn.add_theme_font_size_override("font_size", _sf(14))
-		help_btn.add_theme_color_override("font_color", Color(0.75, 0.88, 1.00))
-		var hs = StyleBoxFlat.new()
-		hs.bg_color     = Color(0.08, 0.16, 0.30)
-		hs.border_color = Color(0.35, 0.55, 0.80, 0.55)
-		hs.set_border_width_all(1)
-		hs.set_corner_radius_all(4)
-		var hsh = hs.duplicate()
-		hsh.bg_color = Color(0.12, 0.22, 0.42)
-		help_btn.add_theme_stylebox_override("normal", hs)
-		help_btn.add_theme_stylebox_override("hover",  hsh)
-		help_btn.pressed.connect(_on_help_pressed)
-		panel.add_child(help_btn)
+func _build_deck_selector(panel: Panel, g: Dictionary):
+	var deck_opts: Array = g["deck_options"]
+	var deck_btns: Array = []
+	var acc = g["accent"]
+	var dbw = int(48 * _pws)
+	var dbh = _sy(20)
+	var dbx = int(12 * _pws)
+	var dby = _sy(172)
 
-# ---- フッター ----
+	for val in deck_opts:
+		var db = Button.new()
+		db.text = "×%d" % val
+		db.position = Vector2(dbx, dby)
+		db.size = Vector2(dbw, dbh)
+		db.add_theme_font_size_override("font_size", _sf(11))
+		panel.add_child(db)
+		deck_btns.append(db)
+		dbx += dbw + int(6 * _pws)
+
+	var refresh_deck = func():
+		for k in deck_btns.size():
+			var act = GameConfig.num_decks == deck_opts[k]
+			var sn = StyleBoxFlat.new()
+			sn.bg_color     = Color(acc.r * 0.22, acc.g * 0.22, acc.b * 0.08, 0.85) if act else Color(0, 0, 0, 0)
+			sn.border_color = Color(acc, 0.80 if act else 0.28)
+			sn.set_border_width_all(1)
+			sn.set_corner_radius_all(10)
+			sn.content_margin_left  = 4
+			sn.content_margin_right = 4
+			deck_btns[k].add_theme_stylebox_override("normal", sn)
+			var snh = sn.duplicate()
+			snh.bg_color = Color(acc.r * 0.18, acc.g * 0.18, acc.b * 0.06, 0.70)
+			deck_btns[k].add_theme_stylebox_override("hover", snh)
+			deck_btns[k].add_theme_color_override("font_color",
+				Color(acc, 1.0) if act else Color(acc.r, acc.g, acc.b, 0.55))
+
+	for k in deck_btns.size():
+		var opt_val = deck_opts[k]
+		deck_btns[k].pressed.connect(func():
+			SoundManager.play_card_click()
+			GameConfig.num_decks = opt_val
+			refresh_deck.call()
+		)
+	refresh_deck.call()
 
 func _build_footer():
-	var btn_w = int(180 * _pws)
-	var btn_h = int(46 * _phs)
+	var btn_w   = int(160 * _pws)
+	var btn_h   = int(38 * _phs)
 	var btn_gap = int(20 * _pws)
 	var total_w = btn_w * 2 + btn_gap
-	var bx = int((_sw - total_w) / 2)
-	# パネル下端から画面下端の 35% の位置
-	var by = int(_py + _ph + (_sh - _py - _ph) * 0.35)
+	var bx      = int((_sw - total_w) / 2)
+	var by      = int(_py + _ph + (_sh - _py - _ph) * 0.42)
 
-	_add_footer_button("設　　定",  Vector2(bx,                  by), btn_w, btn_h, Color(0.10, 0.26, 0.20), _on_settings_pressed)
-	_add_footer_button("ゲーム終了", Vector2(bx + btn_w + btn_gap, by), btn_w, btn_h, Color(0.28, 0.10, 0.10), _on_quit_pressed)
+	_add_footer_button("設　　定",   Vector2(bx, by),                   btn_w, btn_h,
+		Color(0.40, 0.70, 1.00), _on_settings_pressed)
+	_add_footer_button("ゲーム終了", Vector2(bx + btn_w + btn_gap, by),  btn_w, btn_h,
+		Color(1.00, 0.40, 0.50), _on_quit_pressed)
 
-func _add_footer_button(text: String, pos: Vector2, w: int, h: int, bg_color: Color, callback: Callable):
+func _add_footer_button(text: String, pos: Vector2, w: int, h: int, accent: Color, callback: Callable):
 	var btn = Button.new()
 	btn.text = text
 	btn.position = pos
 	btn.size = Vector2(w, h)
-	btn.add_theme_font_size_override("font_size", _sf(20))
-	var mk = func(col: Color) -> StyleBoxFlat:
+	btn.add_theme_font_size_override("font_size", _sf(15))
+	btn.add_theme_color_override("font_color", Color(accent.r, accent.g, accent.b, 0.88))
+	var mk = func(alpha: float) -> StyleBoxFlat:
 		var s = StyleBoxFlat.new()
-		s.bg_color = col
-		s.border_color = Color(0.45, 0.60, 0.45, 0.50)
+		s.bg_color     = Color(accent.r, accent.g, accent.b, alpha)
+		s.border_color = Color(accent.r, accent.g, accent.b, 0.50)
 		s.set_border_width_all(1)
-		s.set_corner_radius_all(6)
+		s.set_corner_radius_all(8)
 		return s
-	btn.add_theme_stylebox_override("normal",  mk.call(bg_color))
-	btn.add_theme_stylebox_override("hover",   mk.call(bg_color.lightened(0.18)))
-	btn.add_theme_stylebox_override("pressed", mk.call(bg_color.darkened(0.12)))
+	btn.add_theme_stylebox_override("normal",  mk.call(0.0))
+	btn.add_theme_stylebox_override("hover",   mk.call(0.12))
+	btn.add_theme_stylebox_override("pressed", mk.call(0.22))
 	btn.pressed.connect(callback)
 	add_child(btn)
-
-# ---- コールバック ----
 
 func _on_play_pressed(scene_path: String):
 	SoundManager.play_card_click()
