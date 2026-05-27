@@ -1033,6 +1033,8 @@ func show_played_cards(player_id: int, cards: Array):
 		card.visible = true
 		card.set_face_up(true, true)
 		card.is_selectable = false
+		if card.has_method("refresh_visual_state"):
+			card.refresh_visual_state()
 
 		if player_id != 0:
 			# AI: アバターpositionからPlay cardsエリアへスライドアニメーション
@@ -1380,7 +1382,11 @@ func evaluate_trick():
 
 	if ui_manager:
 		ui_manager.update_team_scores(team_scores[0], team_scores[1])
-		ui_manager.show_center_message(GameConfig.text("trick_won") % [winner.player_name, points], 2.0)
+		var trick_message = GameConfig.text("trick_won") % [winner.player_name, points]
+		if ui_manager.has_method("show_trick_result"):
+			ui_manager.show_trick_result(winner.player_id, trick_message, 2.0)
+		else:
+			ui_manager.show_center_message(trick_message, 2.0)
 
 	_update_void_tracking()
 	var bottom_multiplier = calculate_bottom_multiplier(winner_play)

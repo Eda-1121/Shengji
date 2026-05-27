@@ -30,6 +30,8 @@ var is_face_up: bool = false
 var sprite: Sprite2D
 var collision_shape: CollisionShape2D
 var area_2d: Area2D
+var selected_glow: Sprite2D
+var trump_glow: Sprite2D
 
 # Animation settings
 const FLIP_DURATION = 0.3
@@ -72,7 +74,11 @@ func _ready():
 	_setup_area2d()
 	load_textures()
 	sprite.texture = back_texture
+	_setup_card_fx()
+	if not GameConfig.card_style_changed.is_connected(_on_card_style_changed):
+		GameConfig.card_style_changed.connect(_on_card_style_changed)
 	original_position = position
+	refresh_visual_state()
 
 func _setup_sprite():
 	if not has_node("Sprite2D"):
@@ -120,6 +126,7 @@ func set_hand_overlap_spacing(spacing: float, is_last_card: bool = false):
 	collision_shape.shape.size = Vector2(visible_width, full_visual_height * 0.82)
 	collision_shape.position = Vector2(-full_visual_width * 0.5 + visible_width * 0.5 + HAND_HIT_X_NUDGE, 0)
 	_update_visible_hints()
+	refresh_visual_state()
 
 func get_visual_card_size() -> Vector2:
 	if sprite and sprite.texture:
@@ -168,18 +175,26 @@ func get_display_name() -> String:
 
 func load_textures():
 	var card_name = get_card_name()
-	var front_path = "res://assets/common/cards/%s.png" % card_name
-	var back_path = "res://assets/common/cards/card_back.png"
+	var front_path = GameConfig.get_card_asset_path(card_name)
+	var back_path = GameConfig.get_card_asset_path("card_back")
 	
 	if ResourceLoader.exists(front_path):
 		front_texture = load(front_path)
 	else:
-		front_texture = create_placeholder_texture(get_card_color())
+		var fallback_front_path = "res://assets/common/card_sets/classic/%s.png" % card_name
+		front_texture = load(fallback_front_path) if ResourceLoader.exists(fallback_front_path) else create_placeholder_texture(get_card_color())
 	
 	if ResourceLoader.exists(back_path):
 		back_texture = load(back_path)
 	else:
-		back_texture = create_placeholder_texture(Color(0.3, 0.3, 0.8))
+		var fallback_back_path = "res://assets/common/card_sets/classic/card_back.png"
+		back_texture = load(fallback_back_path) if ResourceLoader.exists(fallback_back_path) else create_placeholder_texture(Color(0.3, 0.3, 0.8))
+
+func _on_card_style_changed(_style_id: String):
+	load_textures()
+	if sprite:
+		sprite.texture = front_texture if is_face_up else back_texture
+	refresh_visual_state()
 
 func get_card_color() -> Color:
 	match suit:
@@ -230,13 +245,17 @@ func _animate_flip(_from_texture: Texture2D, to_texture: Texture2D):
 	tween.tween_property(sprite, "scale:x", 0.0, FLIP_HALF_TIME)
 	tween.tween_callback(func(): sprite.texture = to_texture)
 	tween.tween_property(sprite, "scale:x", CARD_SCALE, FLIP_HALF_TIME)
-	tween.tween_callback(func(): flip_completed.emit(self))
+	tween.tween_callback(func():
+		refresh_visual_state()
+		flip_completed.emit(self)
+	)
 
 func set_face_up(face_up: bool, instant: bool = false):
 	if instant:
 		is_face_up = face_up
 		sprite.texture = front_texture if face_up else back_texture
 		sprite.scale = Vector2(CARD_SCALE, CARD_SCALE)
+		refresh_visual_state()
 	else:
 		if face_up and not is_face_up:
 			flip_to_front()
@@ -321,6 +340,7 @@ func unhover_effect():
 
 func set_selected(selected: bool):
 	is_selected = selected
+	refresh_visual_state()
 
 	var tween = create_tween()
 	tween.set_ease(Tween.EASE_OUT)
@@ -328,7 +348,7 @@ func set_selected(selected: bool):
 
 	if selected:
 		# Selected: highlight and lift.
-		sprite.modulate = Color(1.3, 1.3, 1.0)
+		sprite.modulate = Color(1.18, 1.13, 0.92)
 		tween.tween_property(self, "position:y", original_position.y - SELECTED_HEIGHT, 0.2)
 	else:
 		# Unselected: restore color and position.
@@ -442,3 +462,43 @@ func get_hint_dot_size() -> int:
 
 func is_wide_hand_spacing() -> bool:
 	return _is_last_hand_card or _hand_overlap_spacing >= WIDE_HAND_SPACING
+
+# ============================================
+# Visual overlays
+# ============================================
+
+func _setup_card_fx():
+	selected_glow = Sprite2D.new()
+	selected_glow.name = "SelectedGlow"
+	selected_glow.texture = ImageTexture.create_from_image(create_card_glow_texture(Color(0.96, 0.78, 0.28, 0.95), 92, 92))
+	selected_glow.z_index = -3
+	selected_glow.visible = false
+	add_child(selected_glow)
+
+	trump_glow = Sprite2D.new()
+	trump_glow.name = "TrumpGlow"
+	trump_glow.texture = ImageTexture.create_from_image(create_card_glow_texture(Color(0.52, 0.92, 1.00, 0.72), 86, 86))
+	trump_glow.z_index = -2
+	trump_glow.visible = false
+	add_child(trump_glow)
+
+func refresh_visual_state():
+	if selected_glow:
+		selected_glow.visible = is_selected
+	if trump_glow:
+		trump_glow.visible = is_face_up and is_trump
+
+func create_card_glow_texture(color: Color, width: int, height: int) -> Image:
+	var img = Image.create(width, height, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var center = Vector2(width * 0.5, height * 0.5)
+	var half = Vector2(width * 0.44, height * 0.44)
+	for y in range(height):
+		for x in range(width):
+			var p = Vector2(x, y)
+			var edge_distance = max(abs(p.x - center.x) / half.x, abs(p.y - center.y) / half.y)
+			if edge_distance <= 1.0:
+				var border = smoothstep(0.72, 1.0, edge_distance)
+				var alpha = border * color.a
+				img.set_pixel(x, y, Color(color.r, color.g, color.b, alpha))
+	return img

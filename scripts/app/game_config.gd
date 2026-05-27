@@ -3,13 +3,30 @@ extends Node
 
 signal play_hints_changed(enabled: bool)
 signal language_changed(language: String)
+signal card_style_changed(style_id: String)
 
 var num_decks: int = 2
 var sound_enabled: bool = true
 var play_hints_enabled: bool = true
+var card_style: String = "default"
 var language: String = "en"
 var total_plays: int = 0
 var wins: int = 0
+
+const CARD_STYLES = {
+	"default": {
+		"folder": "classic",
+		"name_key": "card_style_default",
+	},
+	"minimal": {
+		"folder": "minimal",
+		"name_key": "card_style_minimal",
+	},
+	"illustrated": {
+		"folder": "illustrated",
+		"name_key": "card_style_illustrated",
+	},
+}
 
 const TEXT = {
 	"en": {
@@ -36,6 +53,10 @@ const TEXT = {
 		"game_poker_desc": "2-9 players · Solo\nWin with odds and bluffing",
 		"sound": "Sound",
 		"hints": "Hints",
+		"card_design": "Card Design",
+		"card_style_default": "Classic",
+		"card_style_minimal": "Minimal",
+		"card_style_illustrated": "Illustrated",
 		"language": "Language",
 		"english": "English",
 		"japanese": "Japanese",
@@ -50,6 +71,10 @@ const TEXT = {
 		"selected": "Selected: %d/%d",
 		"play": "Play Cards",
 		"confirm_bury": "Confirm Bury",
+		"action_hint_select_play": "Select cards to play",
+		"action_hint_ready_play": "Ready to play",
+		"action_hint_select_bury": "Select exactly 8 cards",
+		"action_hint_ready_bury": "Ready to bury",
 		"previous_trick": "Previous Trick",
 		"you": "You",
 		"left": "Left",
@@ -130,6 +155,10 @@ const TEXT = {
 		"game_poker_desc": "2-9人 · 個人戦\n確率と駆け引きで勝つ",
 		"sound": "サウンド",
 		"hints": "ヒント表示",
+		"card_design": "カードデザイン",
+		"card_style_default": "クラシック",
+		"card_style_minimal": "ミニマル",
+		"card_style_illustrated": "イラスト",
 		"language": "言語",
 		"english": "英語",
 		"japanese": "日本語",
@@ -144,6 +173,10 @@ const TEXT = {
 		"selected": "選択: %d/%d",
 		"play": "出す",
 		"confirm_bury": "底札を確定",
+		"action_hint_select_play": "出すカードを選択",
+		"action_hint_ready_play": "出せます",
+		"action_hint_select_bury": "ちょうど8枚選択",
+		"action_hint_ready_bury": "底札を確定できます",
 		"previous_trick": "前の手",
 		"you": "あなた",
 		"left": "左",
@@ -224,6 +257,10 @@ const TEXT = {
 		"game_poker_desc": "2-9人 · 个人战\n用概率和诈唬取胜",
 		"sound": "声音",
 		"hints": "提示",
+		"card_design": "牌面设计",
+		"card_style_default": "经典",
+		"card_style_minimal": "极简",
+		"card_style_illustrated": "插画",
 		"language": "语言",
 		"english": "英语",
 		"japanese": "日语",
@@ -238,6 +275,10 @@ const TEXT = {
 		"selected": "已选：%d/%d",
 		"play": "出牌",
 		"confirm_bury": "确认埋底",
+		"action_hint_select_play": "请选择要出的牌",
+		"action_hint_ready_play": "可以出牌",
+		"action_hint_select_bury": "请选择正好8张",
+		"action_hint_ready_bury": "可以确认埋底",
 		"previous_trick": "上一手",
 		"you": "你",
 		"left": "左",
@@ -309,6 +350,23 @@ func set_language(value: String):
 		return
 	language = value
 	language_changed.emit(language)
+
+func set_card_style(style_id: String):
+	if not CARD_STYLES.has(style_id):
+		style_id = "default"
+	if card_style == style_id:
+		return
+	card_style = style_id
+	card_style_changed.emit(card_style)
+
+func get_card_asset_path(card_name: String) -> String:
+	var style = CARD_STYLES.get(card_style, CARD_STYLES["default"])
+	var folder = style.get("folder", "classic")
+	return "res://assets/common/card_sets/%s/%s.png" % [folder, card_name]
+
+func get_card_style_name(style_id: String) -> String:
+	var style = CARD_STYLES.get(style_id, CARD_STYLES["default"])
+	return text(style.get("name_key", "card_style_default"))
 
 func text(key: String) -> String:
 	var table = TEXT.get(language, TEXT["en"])

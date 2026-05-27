@@ -15,6 +15,7 @@ var turn_label: Label
 var action_panel: Panel
 var play_button: Button
 var bury_button: Button
+var action_hint_label: Label
 
 var center_message_panel: Panel
 var center_message: Label
@@ -42,13 +43,20 @@ var _selected_max: int = 8
 signal play_cards_pressed
 signal bury_cards_pressed
 
-const C_GOLD   = Color(0.941, 0.788, 0.416)
-const C_BG     = Color(0.04,  0.09,  0.14,  0.92)
-const C_BORDER = Color(0.941, 0.788, 0.416, 0.30)
+const C_GOLD   = Color(0.918, 0.738, 0.312)
+const C_BG     = Color(0.026, 0.060, 0.082, 0.92)
+const C_BORDER = Color(0.918, 0.738, 0.312, 0.34)
+const C_CYAN   = Color(0.55, 0.92, 1.00)
+const C_JADE   = Color(0.32, 0.78, 0.48)
+const C_RED    = Color(0.88, 0.32, 0.29)
 const CENTER_MESSAGE_MIN_WIDTH = 552.0
 const CENTER_MESSAGE_MIN_HEIGHT = 74.0
 const CENTER_MESSAGE_X_PADDING = 56.0
 const CENTER_MESSAGE_Y_PADDING = 22.0
+const ACTION_PANEL_WIDTH = 260.0
+const ACTION_PANEL_HEIGHT = 78.0
+const ACTION_BUTTON_WIDTH = 160.0
+const ACTION_BUTTON_HEIGHT = 46.0
 
 func _ready():
 	layer = 1
@@ -66,6 +74,8 @@ func make_panel_style(bg_color: Color, border_color: Color = C_BORDER) -> StyleB
 	style.border_color = border_color
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(8)
+	style.shadow_color = Color(0, 0, 0, 0.32)
+	style.shadow_size = 10
 	style.content_margin_left   = 10
 	style.content_margin_right  = 10
 	style.content_margin_top    = 8
@@ -76,10 +86,10 @@ func style_panel(panel: Panel, bg_color: Color = C_BG):
 	panel.add_theme_stylebox_override("panel", make_panel_style(bg_color))
 
 func style_button(button: Button):
-	button.add_theme_stylebox_override("normal",   make_panel_style(Color(0.06, 0.12, 0.20, 0.95), Color(C_GOLD, 0.38)))
-	button.add_theme_stylebox_override("hover",    make_panel_style(Color(0.09, 0.17, 0.28, 0.98), Color(C_GOLD, 0.60)))
-	button.add_theme_stylebox_override("pressed",  make_panel_style(Color(0.04, 0.08, 0.14, 1.00), Color(C_GOLD, 0.80)))
-	button.add_theme_stylebox_override("disabled", make_panel_style(Color(0.05, 0.08, 0.12, 0.60), Color(C_GOLD, 0.15)))
+	button.add_theme_stylebox_override("normal",   make_panel_style(Color(0.035, 0.080, 0.110, 0.95), Color(C_GOLD, 0.38)))
+	button.add_theme_stylebox_override("hover",    make_panel_style(Color(0.055, 0.130, 0.170, 0.98), Color(C_CYAN, 0.55)))
+	button.add_theme_stylebox_override("pressed",  make_panel_style(Color(0.025, 0.055, 0.075, 1.00), Color(C_GOLD, 0.80)))
+	button.add_theme_stylebox_override("disabled", make_panel_style(Color(0.030, 0.050, 0.060, 0.60), Color(C_GOLD, 0.15)))
 	button.add_theme_color_override("font_color",          Color(C_GOLD, 0.90))
 	button.add_theme_color_override("font_disabled_color", Color(C_GOLD, 0.35))
 
@@ -93,7 +103,7 @@ func style_play_button(button: Button):
 		s.content_margin_right = 6
 		return s
 	button.add_theme_stylebox_override("normal",   mk.call(C_GOLD))
-	button.add_theme_stylebox_override("hover",    mk.call(C_GOLD.lightened(0.15)))
+	button.add_theme_stylebox_override("hover",    mk.call(Color(0.98, 0.86, 0.42)))
 	button.add_theme_stylebox_override("pressed",  mk.call(C_GOLD.darkened(0.12)))
 	button.add_theme_stylebox_override("disabled", mk.call(Color(C_GOLD, 0.35)))
 	button.add_theme_color_override("font_color",          Color(0.08, 0.06, 0.02))
@@ -122,7 +132,7 @@ func create_ui():
 	trump_label = Label.new()
 	trump_label.text = GameConfig.text("trump_suit") % "♠"
 	trump_label.add_theme_font_size_override("font_size", 18)
-	trump_label.add_theme_color_override("font_color", Color(0.75, 0.87, 1.00))
+	trump_label.add_theme_color_override("font_color", Color(C_CYAN, 0.96))
 	info_container.add_child(trump_label)
 
 	var separator1 = HSeparator.new()
@@ -138,13 +148,13 @@ func create_ui():
 	team1_title_label = Label.new()
 	team1_title_label.text = GameConfig.text("team_a")
 	team1_title_label.add_theme_font_size_override("font_size", 16)
-	team1_title_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.45))
+	team1_title_label.add_theme_color_override("font_color", Color(C_JADE, 0.95))
 	score_container.add_child(team1_title_label)
 
 	team2_title_label = Label.new()
 	team2_title_label.text = GameConfig.text("team_b")
 	team2_title_label.add_theme_font_size_override("font_size", 16)
-	team2_title_label.add_theme_color_override("font_color", Color(0.95, 0.42, 0.42))
+	team2_title_label.add_theme_color_override("font_color", Color(C_RED, 0.95))
 	score_container.add_child(team2_title_label)
 
 	team1_score_label = Label.new()
@@ -161,7 +171,7 @@ func create_ui():
 	turn_panel.position = Vector2(354, 18)
 	turn_panel.size = Vector2(572, 52)
 	turn_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	style_panel(turn_panel, Color(0.03, 0.07, 0.12, 0.85))
+	style_panel(turn_panel, Color(0.020, 0.055, 0.080, 0.86))
 	add_child(turn_panel)
 
 	turn_label = Label.new()
@@ -178,13 +188,13 @@ func create_ui():
 	# ── アクションパネル ────────────────────────────
 	action_panel = Panel.new()
 	action_panel.position = Vector2(560, 666)
-	action_panel.size = Vector2(160, 50)
+	action_panel.size = Vector2(ACTION_PANEL_WIDTH, ACTION_PANEL_HEIGHT)
 	action_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	add_child(action_panel)
 
 	selected_count_label = Label.new()
-	selected_count_label.position = Vector2(-20, -34)
-	selected_count_label.size = Vector2(200, 28)
+	selected_count_label.position = Vector2(0, -34)
+	selected_count_label.size = Vector2(ACTION_PANEL_WIDTH, 28)
 	selected_count_label.text = GameConfig.text("selected") % [0, 8]
 	selected_count_label.add_theme_font_size_override("font_size", 17)
 	selected_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -193,15 +203,15 @@ func create_ui():
 	action_panel.add_child(selected_count_label)
 
 	var button_container = Control.new()
-	button_container.position = Vector2(10, 1)
-	button_container.size = Vector2(140, 48)
+	button_container.position = Vector2((ACTION_PANEL_WIDTH - ACTION_BUTTON_WIDTH) * 0.5, 0)
+	button_container.size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
 	action_panel.add_child(button_container)
 
 	play_button = Button.new()
 	play_button.text = GameConfig.text("play")
 	play_button.position = Vector2.ZERO
-	play_button.size = Vector2(140, 48)
-	play_button.add_theme_font_size_override("font_size", 20)
+	play_button.size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
+	play_button.add_theme_font_size_override("font_size", 18)
 	style_play_button(play_button)
 	play_button.pressed.connect(_on_play_button_pressed)
 	button_container.add_child(play_button)
@@ -209,12 +219,23 @@ func create_ui():
 	bury_button = Button.new()
 	bury_button.text = GameConfig.text("confirm_bury")
 	bury_button.position = Vector2.ZERO
-	bury_button.size = Vector2(140, 48)
-	bury_button.add_theme_font_size_override("font_size", 20)
+	bury_button.size = Vector2(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT)
+	bury_button.add_theme_font_size_override("font_size", 17)
 	style_play_button(bury_button)
 	bury_button.pressed.connect(_on_bury_button_pressed)
 	bury_button.visible = false
 	button_container.add_child(bury_button)
+
+	action_hint_label = Label.new()
+	action_hint_label.position = Vector2(0, 50)
+	action_hint_label.size = Vector2(ACTION_PANEL_WIDTH, 22)
+	action_hint_label.text = GameConfig.text("action_hint_select_play")
+	action_hint_label.add_theme_font_size_override("font_size", 13)
+	action_hint_label.add_theme_color_override("font_color", Color(C_CYAN, 0.78))
+	action_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	action_hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	action_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	action_panel.add_child(action_hint_label)
 
 	# ── centerメッセージ ──────────────────────────────
 	center_message_panel = Panel.new()
@@ -222,7 +243,7 @@ func create_ui():
 	center_message_panel.size = Vector2(552, 74)
 	center_message_panel.visible = false
 	center_message_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	style_panel(center_message_panel, Color(0.03, 0.07, 0.12, 0.90))
+	style_panel(center_message_panel, Color(0.025, 0.052, 0.070, 0.93))
 	add_child(center_message_panel)
 
 	center_message = Label.new()
@@ -230,7 +251,7 @@ func create_ui():
 	center_message.size = Vector2(524, 58)
 	center_message.text = ""
 	center_message.add_theme_font_size_override("font_size", 28)
-	center_message.add_theme_color_override("font_color", Color(C_GOLD, 0.95))
+	center_message.add_theme_color_override("font_color", Color(C_GOLD, 0.98))
 	center_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	center_message.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	center_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -344,7 +365,7 @@ func apply_layout():
 			turn_label.size = Vector2(turn_panel.size.x - 24, 38)
 
 	if action_panel:
-		action_panel.position = Vector2((w - action_panel.size.x) * 0.5, h - 70)
+		action_panel.position = Vector2((w - action_panel.size.x) * 0.5, h - 98)
 
 	if center_message_panel:
 		center_message_panel.position = Vector2((w - center_message_panel.size.x) * 0.5, h * 0.42)
@@ -387,10 +408,16 @@ func update_trump_suit(suit_symbol: String):
 	trump_label.text = GameConfig.text("trump_suit") % suit_symbol
 
 func update_team_scores(team1_score: int, team2_score: int):
+	var old_team1 = _team1_score
+	var old_team2 = _team2_score
 	_team1_score = team1_score
 	_team2_score = team2_score
 	team1_score_label.text = GameConfig.text("points") % team1_score
 	team2_score_label.text = GameConfig.text("points") % team2_score
+	if team1_score > old_team1:
+		pulse_label(team1_score_label, C_JADE)
+	if team2_score > old_team2:
+		pulse_label(team2_score_label, C_RED)
 
 func update_turn_message(message: String):
 	turn_label.text = message
@@ -423,21 +450,50 @@ func fit_center_message_to_text(message: String):
 
 func set_buttons_enabled(enabled: bool):
 	play_button.disabled = not enabled
+	update_action_hint()
 
 func highlight_current_player(player_id: int):
 	for i in range(player_avatars.size()):
 		if i == player_id:
 			player_avatars[i].modulate = Color(1.3, 1.2, 0.9)
+			pulse_panel(player_avatars[i], Color(C_GOLD, 1.0), Color(1.3, 1.2, 0.9))
 		else:
 			player_avatars[i].modulate = Color.WHITE
+
+func show_trick_result(winner_player_id: int, message: String, duration: float = 2.0):
+	if winner_player_id >= 0 and winner_player_id < player_avatars.size():
+		pulse_panel(player_avatars[winner_player_id], Color(C_CYAN, 1.0), player_avatars[winner_player_id].modulate)
+	show_center_message(message, duration)
+
+func pulse_panel(panel: Panel, color: Color, restore_color: Color = Color.WHITE):
+	if panel == null:
+		return
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(panel, "modulate", color, 0.12)
+	tween.tween_property(panel, "modulate", restore_color, 0.34)
+
+func pulse_label(label: Label, color: Color):
+	if label == null:
+		return
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_BACK)
+	tween.tween_property(label, "scale", Vector2(1.14, 1.14), 0.12)
+	tween.parallel().tween_property(label, "modulate", color, 0.12)
+	tween.tween_property(label, "scale", Vector2.ONE, 0.28)
+	tween.parallel().tween_property(label, "modulate", Color.WHITE, 0.28)
 
 func show_bury_button(visible: bool):
 	bury_button.visible = visible
 	selected_count_label.visible = visible
 	play_button.visible = not visible
+	update_action_hint()
 
 func set_bury_button_enabled(enabled: bool):
 	bury_button.disabled = not enabled
+	update_action_hint()
 
 func update_selected_count(count: int, max_count: int = 8):
 	_selected_count = count
@@ -452,6 +508,15 @@ func update_selected_count(count: int, max_count: int = 8):
 			selected_count_label.add_theme_color_override("font_color", Color(0.95, 0.42, 0.42))
 		else:
 			selected_count_label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+	update_action_hint()
+
+func update_action_hint():
+	if action_hint_label == null:
+		return
+	if bury_button and bury_button.visible:
+		action_hint_label.text = GameConfig.text("action_hint_ready_bury") if not bury_button.disabled else GameConfig.text("action_hint_select_bury")
+	elif play_button:
+		action_hint_label.text = GameConfig.text("action_hint_ready_play") if not play_button.disabled else GameConfig.text("action_hint_select_play")
 
 func update_player_card_count(player_id: int, count: int):
 	if player_id < player_card_count_labels.size():
@@ -492,6 +557,8 @@ func _on_language_changed(_language: String):
 		play_button.text = GameConfig.text("play")
 	if bury_button:
 		bury_button.text = GameConfig.text("confirm_bury")
+	if action_hint_label:
+		update_action_hint()
 	if last_trick_button:
 		last_trick_button.text = GameConfig.text("close") if last_trick_visible else GameConfig.text("previous_trick")
 	for i in range(player_name_labels.size()):

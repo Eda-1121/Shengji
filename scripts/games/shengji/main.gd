@@ -15,7 +15,7 @@ func _ready():
 	center_window(window_size)
 	
 	background = ColorRect.new()
-	background.color = Color(0.035, 0.080, 0.055)
+	background.color = Color(0.018, 0.055, 0.035)
 	background.position = Vector2.ZERO
 	background.size = Vector2(window_size)
 	background.z_index = -10
@@ -73,8 +73,9 @@ func _on_language_changed(_language: String):
 	get_window().title = GameConfig.text("shengji_title")
 
 func apply_layout():
+	var viewport_size = get_viewport().get_visible_rect().size
 	if background:
-		background.size = get_viewport().get_visible_rect().size
+		background.size = viewport_size
 
 func get_target_window_size() -> Vector2i:
 	var screen = DisplayServer.window_get_current_screen()

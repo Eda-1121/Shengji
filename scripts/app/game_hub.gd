@@ -97,6 +97,7 @@ func _build():
 	_build_header()
 	_build_score_bar()
 	_build_game_panels()
+	_build_card_style_selector()
 	_build_footer()
 
 func _build_bg():
@@ -377,13 +378,75 @@ func _build_deck_selector(panel: Panel, g: Dictionary):
 		)
 	refresh_deck.call()
 
+func _build_card_style_selector():
+	var style_ids = GameConfig.CARD_STYLES.keys()
+	if style_ids.is_empty():
+		return
+
+	var label_w = int(132 * _pws)
+	var btn_w = int(112 * _pws)
+	var btn_h = int(30 * _phs)
+	var gap = int(8 * _pws)
+	var total_w = label_w + gap + style_ids.size() * btn_w + max(0, style_ids.size() - 1) * gap
+	var x = int((_sw - total_w) * 0.5)
+	var y = int(_py + _ph + max(14.0, (_sh - _py - _ph) * 0.16))
+
+	var label = Label.new()
+	label.text = GameConfig.text("card_design")
+	label.position = Vector2(x, y + 4)
+	label.size = Vector2(label_w, btn_h)
+	label.add_theme_font_size_override("font_size", _sf(12))
+	label.add_theme_color_override("font_color", Color(0.60, 0.74, 0.90, 0.70))
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(label)
+
+	x += label_w + gap
+	for style_id in style_ids:
+		var style_to_set = String(style_id)
+		var btn = Button.new()
+		btn.text = GameConfig.get_card_style_name(style_to_set)
+		btn.position = Vector2(x, y)
+		btn.size = Vector2(btn_w, btn_h)
+		btn.add_theme_font_size_override("font_size", _sf(12))
+		_style_card_style_button(btn, style_to_set == GameConfig.card_style)
+		btn.pressed.connect(func():
+			SoundManager.play_card_click()
+			GameConfig.set_card_style(style_to_set)
+			_build()
+		)
+		add_child(btn)
+		x += btn_w + gap
+
+func _style_card_style_button(btn: Button, active: bool):
+	var acc = Color(0.941, 0.788, 0.416)
+	var mk = func(bg: Color, border: Color) -> StyleBoxFlat:
+		var s = StyleBoxFlat.new()
+		s.bg_color = bg
+		s.border_color = border
+		s.set_border_width_all(1)
+		s.set_corner_radius_all(8)
+		s.content_margin_left = 8
+		s.content_margin_right = 8
+		return s
+	if active:
+		btn.add_theme_stylebox_override("normal", mk.call(Color(acc, 0.95), Color(acc, 1.0)))
+		btn.add_theme_stylebox_override("hover", mk.call(Color(acc.lightened(0.10), 1.0), Color(acc, 1.0)))
+		btn.add_theme_stylebox_override("pressed", mk.call(Color(acc.darkened(0.12), 1.0), Color(acc, 1.0)))
+		btn.add_theme_color_override("font_color", Color(0.08, 0.06, 0.02))
+	else:
+		btn.add_theme_stylebox_override("normal", mk.call(Color(0.03, 0.07, 0.11, 0.65), Color(acc, 0.28)))
+		btn.add_theme_stylebox_override("hover", mk.call(Color(0.05, 0.11, 0.17, 0.85), Color(acc, 0.48)))
+		btn.add_theme_stylebox_override("pressed", mk.call(Color(0.025, 0.055, 0.085, 0.85), Color(acc, 0.55)))
+		btn.add_theme_color_override("font_color", Color(acc, 0.78))
+
 func _build_footer():
 	var btn_w   = int(160 * _pws)
 	var btn_h   = int(38 * _phs)
 	var btn_gap = int(20 * _pws)
 	var total_w = btn_w * 2 + btn_gap
 	var bx      = int((_sw - total_w) / 2)
-	var by      = int(_py + _ph + (_sh - _py - _ph) * 0.42)
+	var by      = int(_py + _ph + (_sh - _py - _ph) * 0.54)
 
 	_add_footer_button(GameConfig.text("settings"), Vector2(bx, by), btn_w, btn_h,
 		Color(0.40, 0.70, 1.00), _on_settings_pressed)
